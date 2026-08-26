@@ -1,0 +1,28 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# MLflow tracking (nunca se versiona, ver .claude/rules/experiment-tracking.md)
+mlruns/
+mlruns_smoke_test/
+mlflow.db
+
+# AutoGluon artifacts
+AutogluonModels/
+*/autogluon_smoke/
+
+# Datos (inmutables, no se versionan en git)
+data/raw/
+data/external/
+
+# Artefactos de modelos entrenados
+models/*.pkl
+models/*.skops
+

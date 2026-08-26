@@ -1,0 +1,743 @@
+DOCUMENTO DE ESPECIFICACION TECNICA (VERSION MEJORADA)
+Fecha de referencia: 24 de agosto de 2026
+Estado: plan de construccion realista, orientado a portafolio profesional
+Idioma de implementacion recomendado: codigo, nombres de variables y README tecnico en ingles; notas de trabajo pueden estar en espanol.
+
+NOTA SOBRE DEPENDENCIAS CRITICAS:
+AutoGluon Tabular suele tener restricciones de version con scikit-learn, numpy y pandas.
+Si el smoke test (Fase 0) no logra una instalacion unificada, NO se debe forzar.
+La solucion aceptable es documentar la incompatibilidad y usar dos entornos virtuales separados
+(por ejemplo, uno para sklearn/skrub/skore/skops y otro para AutoGluon), con sus respectivos lockfiles.
+El proyecto seguira siendo reproducible si se indica claramente como activar cada entorno.
+Esta decision pragmatica es mejor que perder tiempo en conflictos de dependencias.
+
+PRINCIPIO DE EJECUCION
+======================
+Este documento NO es una lista de tecnologias que deban aparecer a la fuerza.
+Cada herramienta se incorpora solo si resuelve un problema verificable.
+
+Reglas obligatorias:
+1. No comenzar por AutoGluon, tuning ni ensembles.
+2. No comenzar por MLflow antes de tener una ejecucion local minima que funcione.
+3. No añadir una herramienta si no existe una pregunta experimental que justifique su uso.
+4. No introducir MLOps completo: no Kubernetes, Airflow, serving, monitoring, feature store, CI/CD de modelos ni cloud obligatoria.
+5. Los notebooks son para exploracion y comunicacion; la logica reusable debe terminar en src/.
+6. Cada etapa tiene un criterio de salida. Si no se cumple, NO se avanza.
+7. Se conserva un holdout final que no se usa para tomar decisiones de modelado.
+8. Kaggle leaderboard es una comprobacion externa, no el mecanismo principal de seleccion.
+9. Antes de fijar versiones, se realiza un smoke test conjunto de dependencias y luego se genera el lockfile.
+10. Toda afirmacion de mejora debe estar respaldada por validacion reproducible, no por una unica corrida.
+
+POLITICA DE ENTORNO Y VERSIONES
+===============================
+Base recomendada:
+- Python 3.11.
+- Entorno aislado por proyecto.
+- uv o pip para instalar; generar lockfile despues del smoke test.
+- pandas para manipulacion tabular principal.
+- matplotlib para graficos reproducibles.
+- scikit-learn como API base.
+- skrub para exploracion/preprocesamiento tabular cuando aporte valor.
+- skore para evaluacion estructurada y comparacion de estimadores.
+- AutoGluon Tabular como challenger AutoML, no como sustituto del razonamiento.
+- MLflow Tracking como libro mayor de experimentos.
+- skops para persistencia mas segura de objetos compatibles con scikit-learn.
+- pytest para pruebas.
+- ruff para calidad estatica.
+
+ADVERTENCIAS DE COMPATIBILIDAD
+==============================
+- skore esta en desarrollo activo: fijar la version que pase el smoke test y no actualizar durante el proyecto sin una rama de mantenimiento.
+- skops no puede persistir cualquier funcion Python arbitraria. Evitar FunctionTransformer con funciones locales/lambdas dentro del pipeline final que se quiera serializar.
+- AutoGluon persiste su TabularPredictor con su propio mecanismo; no intentar guardarlo con skops.
+- MLflow y skore tienen areas que se solapan en almacenamiento/seguimiento. En estos proyectos:
+  * skore = evaluacion, diagnostico y reportes.
+  * MLflow = historial transversal de runs, parametros, metricas y artefactos.
+  No duplicar todo automaticamente.
+- El lockfile final es parte del entregable.
+- **Incompatibilidad conocida**: AutoGluon puede requerir versiones antiguas de scikit-learn, mientras que skrub/skore necesitan las modernas. Si el smoke test falla, documentar y separar entornos (ver nota al inicio).
+
+
+PROYECTO 1 — F1 PIT STOP PREDICTION
+===================================
+
+1. PROBLEMA
+-----------
+Competicion: Kaggle Playground Series S6E5 — Predicting F1 Pit Stops.
+Objetivo oficial: predecir la probabilidad de que un piloto entre a pits en la siguiente vuelta.
+Target: PitNextLap.
+Metrica Kaggle: ROC-AUC.
+Dataset Kaggle: train.csv, test.csv, sample_submission.csv; el dataset publicado contiene 33 columnas.
+El dataset es sintetico y esta inspirado en un dataset real de estrategia de F1. Kaggle permite estudiar/incorporar el dataset original.
+
+Pregunta de portafolio:
+"How much does a carefully designed, leakage-aware ML pipeline gain or lose against AutoML, and what is the cost in complexity, compute and interpretability?"
+
+Este proyecto NO tiene como meta ganar la competicion.
+Tiene como meta demostrar:
+- diseno correcto de validacion;
+- deteccion de leakage;
+- feature engineering temporal/contextual;
+- comparacion justa manual ML vs AutoML;
+- evaluacion reproducible;
+- registro de experimentos;
+- persistencia apropiada del modelo final.
+
+2. HIPOTESIS
+------------
+H1. Una validacion aleatoria ingenua puede producir una estimacion demasiado optimista si filas relacionadas con una misma carrera/entidad aparecen en train y validation.
+H2. Feature engineering causalmente valido, construido solo con informacion disponible hasta la vuelta actual, mejora al menos a algunos modelos manuales.
+H3. AutoGluon puede superar a un modelo manual individual, pero no necesariamente ofrece la mejor relacion calidad/tiempo/latencia/complejidad.
+H4. La diferencia entre datos sinteticos y datos F1 originales puede ser suficientemente grande para que mezclar datos sin analizar distribucion perjudique la generalizacion.
+
+3. FUERA DE ALCANCE
+-------------------
+- simulador completo de carrera;
+- reinforcement learning;
+- prediccion de estrategia multi-vuelta;
+- API de produccion;
+- Docker obligatorio;
+- cloud obligatorio;
+- streaming;
+- telemetria en tiempo real;
+- MLOps end-to-end.
+
+4. ARQUITECTURA DEL REPOSITORIO
+-------------------------------
+f1-pitstop-ml/
+|
+|-- README.md
+|-- pyproject.toml
+|-- uv.lock (o varios lockfiles si se opta por entornos separados)
+|-- .python-version
+|-- .gitignore
+|-- .env.example
+|
+|-- configs/
+|   |-- data.yaml
+|   |-- validation.yaml
+|   |-- features.yaml
+|   |-- models.yaml
+|   `-- experiments.yaml
+|
+|-- data/
+|   |-- raw/             # Kaggle; inmutable; normalmente gitignored
+|   |-- external/        # dataset F1 original si se usa
+|   |-- interim/         # salidas intermedias regenerables
+|   `-- processed/       # solo si realmente es necesario materializar features
+|
+|-- notebooks/
+|   |-- 01_data_audit.ipynb
+|   |-- 02_eda.ipynb
+|   |-- 03_leakage_and_validation.ipynb
+|   `-- 04_results_review.ipynb
+|
+|-- src/
+|   `-- f1pitstop/
+|       |-- __init__.py
+|       |-- data/
+|       |   |-- ingest.py
+|       |   |-- schema.py
+|       |   `-- split.py
+|       |-- features/
+|       |   |-- build.py
+|       |   |-- temporal.py
+|       |   `-- preprocessing.py
+|       |-- models/
+|       |   |-- baselines.py
+|       |   |-- sklearn_candidates.py
+|       |   |-- tune.py
+|       |   `-- autogluon_runner.py
+|       |-- evaluation/
+|       |   |-- metrics.py
+|       |   |-- skore_reports.py
+|       |   `-- error_analysis.py
+|       |-- tracking/
+|       |   `-- mlflow_utils.py
+|       |-- persistence/
+|       |   `-- skops_io.py
+|       `-- submission.py
+|
+|-- scripts/
+|   |-- smoke_test_stack.py
+|   |-- prepare_data.py
+|   |-- train_baselines.py
+|   |-- train_manual.py
+|   |-- train_autogluon.py
+|   |-- evaluate_final.py
+|   `-- make_submission.py
+|
+|-- artifacts/
+|   |-- reports/
+|   |-- figures/
+|   |-- tables/
+|   `-- model_cards/
+|
+|-- models/
+|   |-- sklearn/
+|   `-- autogluon/
+|
+`-- tests/
+    |-- test_schema.py
+    |-- test_split.py
+    |-- test_features.py
+    |-- test_pipeline.py
+    `-- test_submission.py
+
+Nota sobre .gitignore: ademas de lo habitual, incluir mlruns/, data/raw/, data/external/ (si son grandes),
+y artifacts/plots generados automaticamente (opcional). Mantener solo codigo y configuraciones.
+
+5. FASE 0 — SMOKE TEST DEL STACK
+--------------------------------
+Objetivo:
+probar que el entorno real puede importar y ejecutar una operacion minima con cada libreria antes de escribir la arquitectura completa.
+
+Herramientas:
+Python 3.11, scikit-learn, skrub, skore, skops, MLflow, AutoGluon Tabular.
+
+smoke_test_stack.py debe:
+1. imprimir python --version y versiones de paquetes;
+2. crear un DataFrame diminuto mixto;
+3. construir un skrub.tabular_pipeline(LogisticRegression());
+4. hacer fit/predict_proba;
+5. ejecutar skore.evaluate(...);
+6. abrir un run local de MLflow y registrar 1 parametro + 1 metrica;
+7. serializar un Pipeline sklearn pequeno con skops;
+8. inspeccionar get_untrusted_types();
+9. cargarlo solo si los tipos son conocidos/aceptados;
+10. entrenar un TabularPredictor de AutoGluon con un time_limit muy corto sobre datos toy.
+
+Criterio de salida:
+TODOS los pasos anteriores funcionan en el mismo entorno.
+Solo entonces se genera uv.lock y se hace el primer commit de dependencias.
+
+**Si AutoGluon rompe el entorno:**
+- aislar la causa;
+- preferir resolver dependencias antes que crear dos entornos;
+- si realmente requiere entorno separado, documentarlo explicitamente en el README y en un archivo environment_autogluon.yml o requirements_autogluon.txt.
+- NO fingir una unica instalacion reproducible. En su lugar, proporcionar instrucciones claras para recrear ambos entornos.
+- El proyecto mantendra su valor siempre que la separacion este justificada y documentada.
+
+6. FASE 1 — INGESTA Y AUDITORIA
+-------------------------------
+Archivo: src/f1pitstop/data/ingest.py
+Herramienta: pandas + pathlib.
+
+Responsabilidades:
+- localizar train/test;
+- cargar sin modificar raw;
+- separar target solo despues de validar su presencia;
+- conservar id como identificador, no como feature por defecto;
+- registrar shape, dtypes y memoria;
+- calcular hash del fichero o un fingerprint simple para trazabilidad.
+
+Archivo: src/f1pitstop/data/schema.py
+Validaciones minimas:
+- target presente solo en train;
+- test no contiene target;
+- id no duplicado si semantica lo exige;
+- dtypes consistentes train/test;
+- mismos nombres de features train/test;
+- proporciones de missing;
+- valores infinitos;
+- duplicados exactos;
+- columnas constantes;
+- cardinalidad;
+- rango del target {0,1};
+- columnas que parecen identificadores;
+- columnas que podrian codificar informacion futura.
+
+Herramienta skrub:
+usar TableReport/Cleaner como apoyo exploratorio, no como sustituto de tests.
+
+Entregable:
+artifacts/reports/data_audit.md o .html + tabla schema_summary.csv.
+
+Criterio de salida:
+se puede explicar cada columna y se ha creado una lista:
+FEATURE_CANDIDATES
+ID_COLUMNS
+TARGET
+SUSPECTED_LEAKAGE
+EXCLUDED_COLUMNS
+
+7. FASE 2 — EDA DIRIGIDO POR PREGUNTAS
+--------------------------------------
+Notebook: 02_eda.ipynb
+
+No hacer un "plot de todo".
+
+Preguntas obligatorias:
+- ¿Que tan desbalanceado esta PitNextLap?
+- ¿Como cambia la tasa de pit por fase de carrera?
+- ¿Existen diferencias por piloto/carrera/compuesto si esas columnas existen?
+- ¿Que variables muestran fuerte separacion univariada?
+- ¿Existen grupos de filas muy correlacionadas?
+- ¿Hay distribucion distinta train vs test?
+- ¿La cardinalidad de categoricas puede generar problemas?
+- ¿Hay columnas sinteticas con artefactos sospechosos?
+
+Graficos minimos:
+- target balance;
+- missingness;
+- distribuciones de variables numericas relevantes por target;
+- tasas de target por categoricas principales;
+- correlaciones/asociaciones seleccionadas;
+- train-vs-test drift de variables importantes.
+
+No concluir causalidad desde EDA.
+
+Criterio de salida:
+una lista priorizada de 5–10 hipotesis que puedan convertirse en experimentos.
+
+8. FASE 3 — VALIDACION Y LEAKAGE
+--------------------------------
+Esta es la fase central.
+
+Archivo: src/f1pitstop/data/split.py
+
+Primero identificar las unidades de dependencia reales disponibles en el dataset.
+No asumir nombres: inspeccionar si existen race, driver, season, event, lap u otras columnas equivalentes.
+
+Comparar como MINIMO:
+V0 = StratifiedKFold aleatorio reproducible.
+V1 = estrategia group-aware si existe un identificador de evento/carrera adecuado.
+V2 = holdout temporal o por eventos posteriores si la estructura temporal lo permite.
+
+Regla:
+el holdout final queda congelado antes del tuning.
+
+Test obligatorio:
+tests/test_split.py debe verificar que los grupos protegidos no se solapan cuando la estrategia seleccionada asi lo exige.
+
+Analisis de leakage:
+para cada feature engineered responder:
+- ¿se conoce en el instante t?
+- ¿usa t+1 o futuro?
+- ¿usa target directa o indirectamente?
+- ¿usa agregados calculados con validation/test?
+- ¿usa estadisticas globales que deben computarse dentro de cada fold?
+
+Resultado esperado:
+elegir UNA estrategia oficial de CV y justificarla en README.
+La estrategia mas "dificil" no es automaticamente mejor; debe corresponder al uso que se afirma simular.
+
+Criterio de salida:
+un notebook demuestra la diferencia entre al menos dos estrategias y documenta por que se elige la definitiva.
+
+9. FASE 4 — BASELINES
+---------------------
+E0: DummyClassifier(strategy="prior") o equivalente.
+E1: LogisticRegression con preprocesamiento sencillo.
+E2: HistGradientBoostingClassifier o modelo tree-native sencillo.
+
+Objetivo:
+establecer el valor incremental real.
+
+Registrar:
+- ROC-AUC CV media;
+- desviacion entre folds;
+- PR-AUC como secundaria si hay desbalance apreciable;
+- tiempo de fit;
+- tiempo de inferencia aproximado;
+- numero de features resultantes.
+
+MLflow:
+activarlo a partir de esta fase.
+Crear experimento "f1_pitstop".
+Usar nombres de run estables:
+E00_dummy
+E01_logreg_basic
+E02_hgb_basic
+
+No registrar modelos gigantes automaticamente en todos los runs si el disco crece sin control.
+Para modelos preliminares puede usarse log_models=False y registrar solo el ganador/candidatos finalistas.
+
+Criterio de salida:
+baselines reproducibles desde scripts, sin depender del notebook.
+
+10. FASE 5 — SKRUB
+------------------
+Pregunta:
+¿skrub simplifica el preprocessing sin degradar la calidad?
+
+Experimentos:
+E03_manual_preprocessing_logreg
+E04_skrub_tabular_pipeline_logreg
+E05_manual_preprocessing_hgb
+E06_skrub_tabular_pipeline_hgb
+
+Usos realistas:
+- TableVectorizer;
+- tabular_pipeline;
+- Cleaner/TableReport si ayudan a entender datos heterogeneos.
+
+No usar:
+TextEncoder o embeddings salvo que existan campos textuales reales con justificacion.
+
+Medir:
+- lineas/complexidad de preprocessing;
+- numero final de columnas;
+- tiempo;
+- ROC-AUC;
+- estabilidad CV.
+
+Decision:
+si skrub no aporta mejora de ergonomia o calidad, documentarlo y usarlo solo donde sea util.
+
+11. FASE 6 — FEATURE ENGINEERING F1
+-----------------------------------
+Archivo: features/temporal.py y build.py.
+
+Crear features SOLO si las columnas de origen existen y la semantica es comprobable.
+
+Familias candidatas:
+- progreso de carrera;
+- vueltas restantes;
+- edad del stint;
+- proxies de degradacion de neumatico;
+- delta de tiempo de vuelta respecto a referencias historicas disponibles;
+- rolling statistics causales: shift(1) antes de rolling;
+- cambios de posicion;
+- interacciones compuesto x circuito/race;
+- caracteristicas relativas al piloto calculadas sin mirar el futuro.
+
+Regla de oro para rolling:
+la fila t no puede usar informacion posterior a t; si la variable a predecir es t+1, revisar cuidadosamente si t es admisible.
+
+**Ejemplo concreto y test asociado:**
+Supongamos que tenemos una columna `lap_time` y queremos una rolling mean de los ultimos 3 tiempos.
+Para predecir `PitNextLap` en la vuelta `t+1`, la feature para la fila `t` debe usar `lap_time` de `t-1`, `t-2`, `t-3` (es decir, `shift(1)` antes de `rolling`).
+En el test `test_features.py` se incluira un DataFrame artificial con 5 vueltas y se comprobara que el valor calculado para la vuelta 3 no incluye `lap_time` de la vuelta 4 ni 5.
+
+Experimentos:
+E10_raw_features
+E11_basic_domain_features
+E12_temporal_features
+E13_full_leakage_safe_features
+
+Cada nueva familia entra mediante ablation:
+base + una familia a la vez.
+No mezclar 40 nuevas variables y atribuir la mejora a "feature engineering".
+
+Tests:
+- mismas filas antes/despues salvo transformacion documentada;
+- no NaN inesperados infinitos;
+- orden temporal conservado cuando aplique;
+- rolling no accede al futuro en un dataset toy controlado.
+
+12. FASE 7 — MODELOS MANUALES
+------------------------------
+Candidatos iniciales, maximo 4–6:
+- LogisticRegression;
+- HistGradientBoostingClassifier;
+- RandomForest o ExtraTrees como contraste;
+- opcional: XGBoost/LightGBM/CatBoost solo si la dependencia adicional se justifica.
+
+No convertir el proyecto en un zoo de modelos.
+
+Procedimiento:
+1. comparar defaults razonables;
+2. seleccionar 2 familias;
+3. hacer tuning limitado solo sobre esas 2.
+
+Tuning:
+RandomizedSearchCV preferente.
+Presupuesto inicial sugerido:
+20–40 configuraciones por familia, CV oficial.
+No usar GridSearch exhaustivo sin evidencia.
+
+MLflow:
+autolog de sklearn puede utilizarse para las busquedas.
+Etiquetas:
+feature_set
+validation_strategy
+model_family
+stage
+seed
+
+13. FASE 8 — AUTOGluON CHALLENGER
+---------------------------------
+Archivo: autogluon_runner.py
+
+Objetivo:
+benchmark AutoML honesto, NO darle acceso al holdout final para tomar decisiones.
+
+Primera corrida:
+presets="medium_quality"
+time_limit controlado.
+
+Segunda corrida, solo si la primera justifica coste:
+presets="good_quality" o configuracion equivalente con presupuesto acotado.
+
+No exigir best_quality.
+
+Entradas:
+A0 = raw cleaned data.
+A1 = leakage-safe engineered data.
+
+Evaluacion:
+usar el MISMO holdout externo que el modelo manual.
+No pasar el holdout final como tuning_data.
+Guardar:
+- leaderboard;
+- score_val;
+- score en holdout;
+- pred_time;
+- fit_time;
+- stack_level;
+- espacio en disco del predictor.
+
+MLflow:
+AutoGluon no necesita quedar autologgeado magicamente.
+Registrar manualmente:
+preset, time_limit, eval_metric, filas/columnas, leaderboard.csv, holdout metrics, runtime y path/version del predictor.
+
+Criterio de salida:
+comparacion manual vs AutoML con la misma particion externa y la misma metrica.
+
+14. FASE 9 — SKORE
+------------------
+Usarlo despues de tener candidatos serios.
+
+Funciones objetivo:
+- evaluate() con el splitter oficial cuando el estimador es compatible;
+- ComparisonReport para varios candidatos sklearn;
+- metricas y curvas;
+- timings;
+- permutation importance cuando sea interpretable/viable;
+- checks disponibles que sean pertinentes.
+
+**Advertencia practica:**
+Si `skrub.tabular_pipeline` no es completamente compatible con `skore.evaluate()` (por ejemplo, falla la inspeccion interna), no se debe forzar. En ese caso, se evalua el pipeline con `cross_validate` de sklearn y se usan las metricas calculadas; `skore` se limita a generar los reportes visuales (ROC, PR, etc.) a partir de las predicciones guardadas.
+La decision de no usar skore para ese estimador se documenta como una limitacion tecnica, no como un fracaso.
+
+Reportes minimos:
+- CV summary;
+- ROC curve;
+- precision-recall curve;
+- calibration curve si aporta informacion;
+- confusion matrix a un umbral documentado solo para analisis;
+- permutation importance del finalista sklearn (si el estimador lo permite).
+
+15. FASE 10 — ERROR ANALYSIS
+----------------------------
+Crear predicciones OOF o del holdout con:
+row id
+y_true
+y_score
+y_pred_thresholded
+model
+fold
+
+Segmentar errores solo por variables disponibles:
+- fase de carrera;
+- piloto;
+- compuesto;
+- evento/circuito;
+- rangos de stint;
+- probabilidad/confianza.
+
+Preguntas:
+- ¿donde baja AUC?
+- ¿hay segmentos con pocos datos?
+- ¿el modelo manual y AutoGluon fallan en las mismas filas?
+- ¿existe oportunidad real de ensemble o solo ganancia marginal?
+
+No crear ensemble salvo que:
+1. exista diversidad de errores demostrable;
+2. se construya con OOF, nunca ajustado sobre el holdout final.
+
+16. FASE 11 — MLflow FINAL
+--------------------------
+MLflow es el registro central de experimentos.
+
+Estructura de tags:
+project=f1_pitstop
+stage=baseline|features|tuning|automl|final
+model_family=...
+feature_set=...
+validation=...
+seed=...
+
+Metricas:
+cv_roc_auc_mean
+cv_roc_auc_std
+holdout_roc_auc
+holdout_pr_auc
+fit_seconds
+predict_ms_per_1k_rows (si se mide consistentemente)
+
+Artefactos:
+config usada
+feature list
+skore summary exportado
+plots
+leaderboard AutoGluon
+environment freeze
+modelo final solo donde proceda
+
+**Gestion de artefactos pesados:**
+- No versionar mlruns completo en Git. Anadir a .gitignore.
+- Incluir un script en scripts/ que permita descargar el mejor run de MLflow desde un almacenamiento externo (p.ej. S3 o incluso un enlace de Kaggle) si se desea compartir. Pero en el portafolio basta con las metricas y graficos guardados en artifacts/.
+
+17. FASE 12 — SKOPS
+-------------------
+Aplicar solo al pipeline sklearn final.
+
+Proceso:
+1. sio.dump(model, "models/sklearn/f1_pitstop.skops")
+2. sio.get_untrusted_types(...)
+3. revisar la lista;
+4. sio.visualize(...), al menos en la validacion del artefacto;
+5. cargar solo los tipos explicitamente aceptados;
+6. verificar igualdad de predict_proba antes/despues dentro de tolerancia.
+
+Si el pipeline incluye funciones personalizadas no serializables:
+- refactorizar a transformadores compatibles;
+- o guardar preprocessing fuera del objeto y documentar;
+- NO volver silenciosamente a pickle como "solucion".
+
+18. FASE 13 — HOLDOUT FINAL Y KAGGLE
+------------------------------------
+El holdout final se evalua UNA vez para la seleccion final documentada.
+Despues se puede reentrenar con todos los datos de entrenamiento para generar submission.
+
+Guardar:
+submission.csv
+run_id
+git commit
+model configuration
+feature set
+
+Kaggle score:
+se reporta como evidencia externa.
+No reajustar repetidamente todo el proyecto contra el public leaderboard.
+
+**Si el score de Kaggle es bajo pero el holdout interno era alto:** documentar como posible drift (hipotesis H4). No se permite reentrenar con el dataset original de F1 ni modificar el modelo para mejorar el score de Kaggle despues de verlo. La integridad del experimento es mas importante que la posicion en el leaderboard.
+
+19. TESTS MINIMOS
+-----------------
+test_schema.py:
+- target;
+- columnas;
+- dtypes criticos.
+
+test_split.py:
+- reproducibilidad;
+- ausencia de solapamiento de grupos cuando aplique.
+
+test_features.py:
+- sin futuro en rolling toy;
+- columnas esperadas;
+- finitos.
+
+test_pipeline.py:
+- fit en muestra;
+- predict_proba shape;
+- probabilidades [0,1].
+
+test_submission.py:
+- columnas exactas;
+- mismo numero de filas que test;
+- ids alineados;
+- probabilidades validas.
+
+20. MATRIZ DE EXPERIMENTOS MINIMA
+---------------------------------
+E00 Dummy
+E01 Logistic basic
+E02 HGB basic
+E03 Manual preprocessing
+E04 skrub preprocessing
+E10 raw
+E11 domain/basic
+E12 temporal
+E13 full leakage-safe
+E20 tuned manual candidate A
+E21 tuned manual candidate B
+A00 AutoGluon raw
+A01 AutoGluon engineered
+F00 final sklearn
+F01 final AutoGluon
+
+No ejecutar todos si una fase demuestra que una rama carece de sentido.
+
+21. ENTREGABLES PARA RECLUTADOR
+-------------------------------
+README debe contener:
+- problema;
+- arquitectura;
+- por que la validacion fue dificil;
+- ejemplo concreto de leakage evitado (idealmente con codigo o descripcion clara);
+- baseline -> features -> tuned model -> AutoML;
+- tabla de resultados (incluyendo tiempo de computo y complejidad);
+- coste de compute (aproximado en horas/segundos);
+- por que se usa/no se usa skrub;
+- por que skops solo aplica al modelo compatible;
+- capturas/exports de MLflow (pueden ser enlaces a imagenes en artifacts/);
+- conclusion: cuando gana manual ML y cuando AutoML;
+- **Decisiones negativas explicitas**: por que no se uso XGBoost, por que no se hizo ensemble, por que se descarto cierta feature, por que no se mezclaron datos reales, etc. Estas son tan importantes como las decisiones positivas.
+
+Figuras (guardadas en artifacts/figures/):
+01_target_balance.png
+02_validation_comparison.png (mostrando la diferencia entre CV naive y group-aware)
+03_feature_ablation.png
+04_model_comparison.png
+05_error_segments.png
+06_manual_vs_automl_tradeoff.png (scatter tiempo vs rendimiento)
+
+22. DEFINITION OF DONE
+----------------------
+El proyecto esta terminado cuando:
+[ ] entorno reproducible + lockfile (o documentacion de multiples entornos);
+[ ] raw data no modificado;
+[ ] data audit;
+[ ] EDA orientado a preguntas;
+[ ] validacion defendible y testada;
+[ ] leakage analysis explicito;
+[ ] Dummy + modelo simple;
+[ ] al menos una comparacion honesta de skrub;
+[ ] feature engineering con ablaciones;
+[ ] maximo 2 familias seriamente tuneadas;
+[ ] AutoGluon challenger con presupuesto limitado;
+[ ] skore aplicado a candidatos compatibles (con las adaptaciones documentadas);
+[ ] MLflow contiene los runs clave;
+[ ] modelo sklearn final validado con skops;
+[ ] holdout final intacto hasta el momento acordado;
+[ ] submission reproducible;
+[ ] tests pasan;
+[ ] README explica decisiones negativas, no solo tecnologias usadas.
+
+23. STOP CONDITIONS
+-------------------
+Detener sofisticacion si:
+- CV no es estable;
+- existen dudas de leakage;
+- un modelo simple ya alcanza el techo empirico (ej. AUC > 0.98 en el holdout);
+- AutoGluon consume recursos sin ganancia material (ej. mejora < 0.001 en AUC);
+- una feature no tiene explicacion o ablation;
+- el siguiente paso solo sirve para "poner otra tecnologia en el CV".
+
+24. FUENTES TECNICAS VERIFICADAS
+--------------------------------
+Kaggle F1:
+https://www.kaggle.com/competitions/playground-series-s6e5
+https://www.kaggle.com/competitions/playground-series-s6e5/data
+
+skrub:
+https://skrub-data.org/stable/reference/generated/skrub.tabular_pipeline.html
+
+skore:
+https://docs.skore.probabl.ai/stable/reference/api/skore.evaluate.html
+https://docs.skore.probabl.ai/stable/reference/report/comparison_report.html
+
+skops:
+https://skops.readthedocs.io/en/stable/persistence.html
+
+AutoGluon:
+https://auto.gluon.ai/stable/install.html
+https://auto.gluon.ai/stable/api/autogluon.tabular.TabularPredictor.fit.html
+
+MLflow:
+https://mlflow.org/docs/latest/ml/tracking/autolog/
