@@ -1,0 +1,17 @@
+column,dtype,n_unique,pct_missing,pct_unique
+id,int64,439140,0.0,100.0
+Driver,object,887,0.0,0.202
+Compound,object,5,0.0,0.0011
+Race,object,26,0.0,0.0059
+Year,int64,4,0.0,0.0009
+PitStop,int64,2,0.0,0.0005
+LapNumber,int64,78,0.0,0.0178
+Stint,int64,8,0.0,0.0018
+TyreLife,float64,78,0.0,0.0178
+Position,int64,20,0.0,0.0046
+LapTime (s),float64,37719,0.0,8.5893
+LapTime_Delta,float64,57532,0.0,13.1011
+Cumulative_Degradation,float64,142701,0.0,32.4956
+RaceProgress,float64,1898,0.0,0.4322
+Position_Change,float64,37,0.0,0.0084
+PitNextLap,float64,2,0.0,0.0005

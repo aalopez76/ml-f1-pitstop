@@ -28,3 +28,8 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 extend-exclude = [".claude"]
+
+[dependency-groups]
+dev = [
+    "kaggle>=2.2.4",
+]
