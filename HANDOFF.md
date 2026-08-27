@@ -154,9 +154,21 @@ Pendiente si se quieren como artefacto de comunicacion, no bloquea Fase 3.
   borrar — esta en `.gitignore`, no se commitea, pero no se elimino del
   disco por no ejecutar un `rm -rf` sin confirmacion explicita.
 - El link al dataset F1 original (para `data/external/`, relevante para
-  H4) esta roto en Kaggle. No bloquea el trabajo actual; si se retoma H4
-  hay que buscar el dataset por otra via (ej. FastF1) y documentar la
-  fuente exacta.
+  H4) esta roto en Kaggle. No bloquea el trabajo actual. **Verificado en
+  esta sesion:** `fastf1` (pip/uv, `uv run --with fastf1 ...`) es una
+  libreria real, funcional en este entorno (probado con
+  `get_event_schedule` y `session.laps` de Bahrain 2023), que trae datos
+  via API sin descargas manuales. Sus columnas (`Driver`, `LapNumber`,
+  `Stint`, `Compound`, `TyreLife`, `Position`, `PitInTime`/`PitOutTime`)
+  coinciden casi exactamente con el esquema sintetico de Kaggle — fuente
+  muy plausible (no 100% confirmada, el link roto impide verificarlo con
+  certeza) para el dataset original que menciona H4. Dato interesante:
+  en FastF1 real, `LapNumber` es consecutivo y `Stint` es monotono,
+  reforzando la conclusion de la Fase 2 (el CSV de Kaggle es sintetico y
+  no preserva esa consistencia). No se instalo como dependencia permanente
+  (regla 3 de CLAUDE.md: sin pregunta experimental que lo justifique
+  todavia — H4 sigue siendo de baja prioridad). Si se retoma H4, este es
+  el camino a seguir.
 - `notebooks/01_data_audit.ipynb` y `02_eda.ipynb` de la arquitectura del
   spec no se crearon todavia (ver "Proxima accion concreta").
 
