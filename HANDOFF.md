@@ -8,12 +8,12 @@
 
 ## Estado actual
 
-- **Fase activa:** Fase 2 (EDA dirigido) — no iniciada todavia.
-- **Ultimo criterio de salida cumplido:** Fase 1 (Ingesta y auditoria) —
-  ver `artifacts/reports/data_audit.md` para el detalle completo. Las
-  cuatro listas requeridas (`FEATURE_CANDIDATES`, `ID_COLUMNS`, `TARGET`,
-  `SUSPECTED_LEAKAGE`, `EXCLUDED_COLUMNS`) estan en la seccion 6 de ese
-  reporte.
+- **Fase activa:** Fase 3 (Validacion y leakage) — no iniciada todavia.
+  **Leer `.claude/rules/leakage-and-validation.md` completo antes de tocar
+  `split.py`.**
+- **Ultimo criterio de salida cumplido:** Fase 2 (EDA dirigido) — ver
+  `artifacts/reports/eda_report.md`. Lista priorizada de 10 hipotesis en
+  la seccion final de ese reporte.
 - **Entorno:** creado con `uv` (Python 3.11.9). `uv.lock` generado y
   commiteado.
 
@@ -41,31 +41,54 @@ validacion de presencia del target) y `src/f1pitstop/data/schema.py`
 `validate_schema()` sobre los datos reales: `has_errors = False`, solo 4
 issues `info` por heuristica de nombre.
 
-## HALLAZGO CRITICO para Fase 3 — leer antes de disenar el split
+## HALLAZGO CRITICO para Fase 3 — leer antes de disenar el split (confirmado en Fase 2)
 
 `Stint` **no es monotono** dentro de `(Driver, Race, Year)` ordenado por
-`LapNumber` en el 80.4% de una muestra de 2,000 grupos (fisicamente
-imposible en una carrera real). Ademas `LapNumber` no es consecutivo
-dentro de un mismo grupo (hay huecos). Ver `data_audit.md` seccion 5.4
-para el detalle completo.
+`LapNumber` en ~80% de una muestra de grupos (fisicamente imposible en
+una carrera real). Ademas `LapNumber` no es consecutivo dentro de un
+mismo grupo (hay huecos). Ver `data_audit.md` seccion 5.4.
+
+**Investigacion adicional en Fase 2 (ver `eda_report.md`, pregunta 8)
+confirmo y explico el mecanismo:**
+- `Position_Change` NO coincide con la diferencia de `Position` entre
+  filas visibles consecutivas → las columnas derivadas
+  (`Position_Change`, `RaceProgress`, `Cumulative_Degradation`,
+  `LapTime_Delta`) se calcularon sobre una secuencia completa oculta, y
+  el CSV publico es un submuestreo de esa secuencia.
+- **Prueba matematica de que la no-monotonicidad de `Stint` NO es un
+  artefacto de submuestreo:** quitar filas de una secuencia no-decreciente
+  nunca puede producir una caida visible. Se observaron caidas de hasta
+  -5 en 81.6% de una muestra de 3,000 grupos → es una inconsistencia real
+  de la generacion sintetica, no solo un efecto de que faltan filas.
+
+**Conclusion:** el dataset es una generacion sintetica que aproxima
+distribuciones/relaciones marginales (Kaggle: *"Feature distributions are
+close to, but not exactly the same, as the original"*) sin garantizar
+restricciones de consistencia secuencial estricta dentro de cada grupo.
 
 **Esto significa que agrupar por `(Driver, Race, Year)` y asumir una
-trayectoria continua de vueltas NO es valido sin mas investigacion.**
+trayectoria continua de vueltas NO es valido sin tratamiento cuidadoso.**
 Afecta directamente:
-- la Fase 3 (que clave de agrupacion usar para el split V1/V2);
-- la Fase 6 (cualquier feature rolling/lag que asuma continuidad de
-  vueltas, regla de oro de `.claude/rules/leakage-and-validation.md`
-  seccion 5, se apoya en un supuesto que hay que verificar primero).
+- la Fase 3 (que clave de agrupacion usar para el split V1/V2 — usar
+  `(Race, Year)`, no `Driver`, ver mas abajo);
+- la Fase 6 (cualquier feature rolling/lag debe usar `LapNumber` como
+  distancia real entre vueltas, no solo el orden de fila, y `Stint` no
+  debe tratarse como contador confiable sin verificacion adicional).
 
-Otros hallazgos del audit (no criticos, pero a resolver en Fase 2/3):
+Otros hallazgos (Fase 1 + Fase 2, no criticos pero a resolver en Fase 3):
 - `Driver` no se comporta como un grid real de F1 (887 valores unicos,
   414 distintos en una sola carrera) — no asumir que es un identificador
   de piloto consistente.
 - `Race` sola no identifica un evento unico (se repite entre `Year`
-  distintos); la clave de agrupacion candidata es `(Race, Year)`.
+  distintos, y train/test comparten las mismas 26 carreras y 4 anios); la
+  clave de agrupacion candidata es `(Race, Year)`.
 - `PitStop` vs `PitNextLap`: diferencia moderada (19.1% vs 24.8% de tasa
   de pit en la siguiente vuelta), no concluyente por si sola — confirmar
   semantica temporal exacta antes de usar `PitStop` como feature.
+- Train y test de Kaggle comparten exactamente las mismas carreras/anios
+  (split row-level, no agrupado) — no imitar ese split para la validacion
+  interna; el objetivo de H1 es evaluar el escenario mas realista
+  (carrera nueva no vista), independiente de como particiono Kaggle.
 
 ## Ultima sesion
 
@@ -80,6 +103,11 @@ Otros hallazgos del audit (no criticos, pero a resolver en Fase 2/3):
   - Auditoria manual mas alla del checklist automatico: balance del
     target (80/20), estructura de `Race`/`Driver`/`Year`, y el hallazgo
     critico de `Stint` no monotono (ver seccion arriba).
+  - Fase 2: EDA dirigido por las 8 preguntas obligatorias del spec.
+    Investigacion a fondo del hallazgo de `Stint` (confirmado que NO es
+    artefacto de submuestreo, con prueba matematica). 7 figuras en
+    `artifacts/figures/`. `artifacts/reports/eda_report.md` con las 8
+    respuestas y 10 hipotesis priorizadas para Fase 3+.
 - **Que se aprendio / decidio (Fase 0, referencia rapida):**
   1. scikit-learn 1.9.0 + AutoGluon 1.6.1 conviven sin conflicto — no hizo
      falta separar entornos.
@@ -94,27 +122,32 @@ Otros hallazgos del audit (no criticos, pero a resolver en Fase 2/3):
 
 ## Proxima accion concreta
 
-Ejecutar Fase 2 del spec (EDA dirigido, notebook `02_eda.ipynb`) con foco
-en responder, en este orden de prioridad:
-1. **Investigar el hallazgo de `Stint` no monotono** (ver seccion arriba)
-   — es el bloqueador conceptual mas importante antes de poder disenar
-   bien la Fase 3.
-2. Confirmar si `(Race, Year)` es la clave de agrupacion correcta.
-3. Confirmar semantica temporal de `PitStop`, `LapTime_Delta`,
-   `Cumulative_Degradation`, `RaceProgress`, `Position_Change` (columnas
-   en `SUSPECTED_LEAKAGE`, ver `data_audit.md` seccion 6).
+Ejecutar Fase 3 del spec (Validacion y leakage). **Leer
+`.claude/rules/leakage-and-validation.md` completo primero** (regla no
+negociable 7 de CLAUDE.md). En orden de prioridad, guiado por las
+hipotesis 1–3 de `eda_report.md`:
+1. Disenar `src/f1pitstop/data/split.py` comparando V0 (StratifiedKFold
+   aleatorio), V1 (group-aware por `(Race, Year)` — no por `Driver` solo,
+   ver hallazgos arriba) y V2 (holdout temporal por `Year`).
+2. Cuantificar cuanto se infla el ROC-AUC con V0 vs V1/V2 (test directo
+   de H1 del spec).
+3. Congelar el holdout final (nunca se usa para decisiones de modelado,
+   solo Fase 13).
+4. Revisar `PitStop` y las columnas de `SUSPECTED_LEAKAGE`
+   (`LapTime_Delta`, `Cumulative_Degradation`, `RaceProgress`,
+   `Position_Change`) con el checklist de 5 preguntas antes de aceptarlas.
+5. Invocar el subagente `leakage-auditor` antes de dar por cerrada esta
+   fase.
 
-Nota: no se genero todavia `notebooks/02_eda.ipynb` ni el previo
-`notebooks/01_data_audit.ipynb` mencionado en la arquitectura del spec —
-el criterio de salida de la Fase 1 (explicar columnas + 4 listas) se
-cubrio via el reporte `.md` + tests, que es reproducible. Si se quiere el
-notebook de Fase 1 como artefacto de comunicacion, sigue pendiente pero no
-bloquea avanzar a Fase 2.
+Nota: `notebooks/01_data_audit.ipynb` y `02_eda.ipynb` de la arquitectura
+del spec no se crearon todavia — los criterios de salida de Fase 1 y 2 se
+cubrieron via reportes `.md` + tests + figuras, que son reproducibles.
+Pendiente si se quieren como artefacto de comunicacion, no bloquea Fase 3.
 
 ## Bloqueadores / dudas abiertas
 
-- **Hallazgo de `Stint` no monotono** (ver seccion dedicada arriba) — la
-  duda abierta mas importante del proyecto en este momento.
+- Decidir en Fase 3 la clave de agrupacion exacta para el split
+  (`(Race, Year)` es la candidata, ver hallazgos arriba).
 - Decidir en Fase 8 si se instalan los extras opcionales de AutoGluon
   (torch/lightgbm/catboost/xgboost).
 - Directorio local `mlruns_smoke_test/` (SQLite del smoke test) sin
@@ -133,8 +166,8 @@ bloquea avanzar a Fase 2.
 |---|---|---|---|
 | 0 — Smoke test | **cerrada** | 2026-08-26 | Un unico entorno; fix de MLflow (sqlite) y skops (allowlist) documentados arriba |
 | 1 — Ingesta y auditoria | **cerrada** | 2026-08-26 | Ver `artifacts/reports/data_audit.md`; hallazgo critico de `Stint` no monotono queda abierto para Fase 3 |
-| 2 — EDA dirigido | pendiente | | prioridad: investigar hallazgo de Stint |
-| 3 — Validacion y leakage | pendiente | | |
+| 2 — EDA dirigido | **cerrada** | 2026-08-26 | Ver `artifacts/reports/eda_report.md`; confirmado que Stint no es artefacto de submuestreo; 10 hipotesis para Fase 3+ |
+| 3 — Validacion y leakage | pendiente | | prioridad: comparar V0/V1/V2, cuantificar H1 |
 | 4 — Baselines | pendiente | | |
 | 5 — skrub | pendiente | | |
 | 6 — Feature engineering | pendiente | | |
