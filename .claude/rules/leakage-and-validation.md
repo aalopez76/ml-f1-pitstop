@@ -64,9 +64,26 @@ terminada.
 
 ## 7. AutoGluon y el holdout
 
-El holdout final NUNCA se pasa como `tuning_data` a AutoGluon. AutoGluon se
-evalua con el MISMO holdout externo que el modelo manual, para que la
-comparacion sea justa.
+El holdout final NUNCA se pasa como `tuning_data` a AutoGluon.
+
+**Ambiguedad resuelta (2026-08-31, confirmada con el usuario antes de
+empezar Fase 8):** "el MISMO holdout externo que el modelo manual" NO
+significa el holdout final congelado (`Year==2025`) — ese es el mismo
+`holdout` de la seccion 3 de este archivo, que la regla no negociable 6
+de CLAUDE.md dice que NUNCA se usa para decisiones de modelado, solo
+para la evaluacion confirmatoria de la Fase 13 (consistente con
+`.claude/rules/experiment-tracking.md`, que restringe
+`holdout_roc_auc`/`holdout_pr_auc` a runs finalistas). Decidir en Fase 8
+si AutoGluon supera al modelo manual usando el holdout final SERIA una
+decision de modelado y violaria esa regla.
+
+Significa, en cambio, el mismo protocolo de evaluacion externa que ya
+uso el modelo manual en las Fases 4-7: **CV V1 sobre `dev`** (nunca V0).
+AutoGluon en Fase 8 se compara contra el modelo manual con el mismo CV
+V1, sin tocar el holdout congelado. El holdout final se evalua UNA
+unica vez en la Fase 13, sobre AMBOS finalistas (`F00_final_sklearn` y
+`F01_final_autogluon`) por igual — ahi si es el mismo holdout externo
+para los dos.
 
 ## 8. Kaggle score vs holdout interno
 

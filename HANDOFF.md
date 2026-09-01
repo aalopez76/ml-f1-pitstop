@@ -383,9 +383,7 @@ Otros hallazgos (Fase 1 + Fase 2, no criticos pero a resolver en Fase 3):
 
 ## Proxima accion concreta
 
-1. **Commitear el trabajo de Fase 3 a Fase 7** (ver "PENDIENTE ANTES DE
-   SEGUIR" arriba) — pedir confirmacion explicita al usuario primero.
-2. Ejecutar Fase 8 del spec (AutoGluon challenger). Ver spec seccion 13:
+1. Ejecutar Fase 8 del spec (AutoGluon challenger). Ver spec seccion 13:
    - Archivo: `autogluon_runner.py`. Objetivo: benchmark AutoML honesto,
      el holdout final NUNCA se pasa como `tuning_data`.
    - Primera corrida: `presets="medium_quality"`, `time_limit` acotado.
@@ -393,28 +391,26 @@ Otros hallazgos (Fase 1 + Fase 2, no criticos pero a resolver en Fase 3):
      justifica el costo. No exigir `best_quality`.
    - Entradas: A0 = raw cleaned data, A1 = leakage-safe engineered data
      (feature set E13 de Fase 6/7).
-   - **Ambiguedad a resolver ANTES de escribir codigo de Fase 8** (no
-     asumir, seguir la regla 2 del protocolo de sesion de CLAUDE.md):
-     `leakage-and-validation.md` §7 dice "AutoGluon se evalua con el
-     MISMO holdout externo que el modelo manual", pero la regla no
-     negociable 6 de CLAUDE.md dice que el holdout final "solo se usa
-     para la evaluacion confirmatoria de la Fase 13". Aclarar si el
-     "holdout externo" de §7 se refiere al holdout congelado
-     (`Year==2025`) — y en ese caso la comparacion real ocurre recien en
-     Fase 13, no en Fase 8 — o a una particion de validacion V1 dentro
-     de dev. El criterio de salida de Fase 8 en el spec ("comparacion
-     manual vs AutoML con la misma particion externa") es compatible con
-     ambas lecturas.
-   - Guardar leaderboard, score_val, score en holdout (si aplica segun
-     lo anterior), pred_time, fit_time, stack_level, espacio en disco
-     del predictor.
+   - **Ambiguedad del holdout resuelta (2026-08-31, confirmada con el
+     usuario):** ver `.claude/rules/leakage-and-validation.md` §7. La
+     comparacion AutoGluon vs modelo manual en Fase 8 usa **CV V1 sobre
+     `dev`** (el mismo protocolo que ya uso el modelo manual en Fases
+     4-7), NO el holdout final congelado (`Year==2025`) — ese se toca
+     una unica vez en Fase 13, sobre ambos finalistas por igual. Decidir
+     el ganador de Fase 8 con el holdout hubiera sido una decision de
+     modelado y violado la regla no negociable 6 de CLAUDE.md.
+   - Guardar leaderboard, score_val (CV V1, no holdout), pred_time,
+     fit_time, stack_level, espacio en disco del predictor.
+     `holdout_roc_auc`/`holdout_pr_auc` NO se loguean en A00/A01 (solo
+     en runs finalistas F00/F01, Fase 13 — ver
+     `.claude/rules/experiment-tracking.md`).
    - MLflow: registrar manualmente (sin autolog magico) preset,
-     time_limit, eval_metric, filas/columnas, leaderboard.csv, holdout
+     time_limit, eval_metric, filas/columnas, leaderboard.csv, CV V1
      metrics, runtime, path/version del predictor.
    - Decidir primero si se instalan los extras opcionales de AutoGluon
      (torch/lightgbm/catboost/xgboost) — ver "Bloqueadores".
    - Criterio de salida: comparacion manual vs AutoML con la misma
-     particion externa y la misma metrica.
+     particion externa (CV V1) y la misma metrica.
    - Usar la skill `/new-experiment` para A00/A01.
 
 Nota: `notebooks/01_data_audit.ipynb` y `02_eda.ipynb` de la arquitectura
@@ -468,7 +464,7 @@ exige explicitamente como criterio de salida de esa fase.
 | 5 — skrub | **cerrada** | 2026-08-28 | calidad practicamente identica (HGB match exacto, logreg +0.004); skrub adoptado donde reduce codigo, no forzado.|
 | 6 — Feature engineering | **cerrada** | 2026-08-28 | E13 gana con 0.860 ROC-AUC (+0.045 vs E10); `laptime_roll_mean_3` invalidada por ablation por-feature reproducible.|
 | 7 — Modelos manuales | **cerrada** | 2026-08-31 | E20_hist_gradient_boosting (tuneado) gana con 0.8611 ROC-AUC; ExtraTrees tuneado 0.8530; Stint crudo confirmado como necesario (-0.030 sin el).|
-| 8 — AutoGluon challenger | pendiente | | decidir extras opcionales (ver bloqueadores); resolver ambiguedad sobre uso del holdout (ver "Proxima accion concreta") |
+| 8 — AutoGluon challenger | pendiente | | decidir extras opcionales (ver bloqueadores); comparar vs manual con CV V1 (ambiguedad del holdout resuelta, ver `leakage-and-validation.md` §7) |
 | 9 — skore | pendiente | | |
 | 10 — Error analysis | pendiente | | |
 | 11 — MLflow final | pendiente | | |
