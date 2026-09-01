@@ -8,22 +8,27 @@
 
 ## Estado actual
 
-- **Fase activa:** Fase 8 (AutoGluon challenger) — no iniciada todavia.
-- **Ultimo criterio de salida cumplido:** Fase 7 (Modelos manuales) — ver
-  `README.md` seccion "Manual models (Fase 7)",
-  `scripts/phase7_manual_models.py`,
-  `artifacts/tables/phase7_defaults_comparison.csv`,
-  `artifacts/tables/phase7_tuning_results.csv`,
-  `artifacts/tables/phase7_stint_ablation.csv`. Ganador:
-  **E20_hist_gradient_boosting (tuneado), ROC-AUC 0.8611±0.0251** (vs
-  0.8599 default, ganancia marginal de tuning; ExtraTrees tuneado
-  0.8530 queda por debajo). Candidato manual que se lleva a Fase 8 para
-  comparar contra AutoGluon. Ablation de Stint (punto abierto de Fase 6)
-  resuelto: quitar `Stint` crudo cuesta -0.030 ROC-AUC, se mantiene en
-  el feature set (E13, 10 columnas, sin cambios respecto a Fase 6).
+- **Fase activa:** Fase 9 (skore) — no iniciada todavia.
+- **Ultimo criterio de salida cumplido:** Fase 8 (AutoGluon challenger)
+  — ver `README.md` seccion "AutoGluon challenger (Fase 8)",
+  `scripts/phase8_autogluon.py`,
+  `artifacts/tables/phase8_autogluon_results.csv`. **A01_autogluon_engineered
+  (E13) = 0.861±0.024 ROC-AUC, empata estadisticamente con el modelo
+  manual ganador de Fase 7** (E20_hist_gradient_boosting, 0.8611;
+  diferencia +0.0003, muy dentro del ruido) a ~5x el costo de computo
+  por fold (121s AutoGluon vs 25s manual). A00 (sin feature engineering,
+  E10) = 0.813, muy por debajo — confirma que el feature engineering
+  manual es el factor dominante, no el algoritmo. Se decidio NO correr
+  una segunda pasada `good_quality` (empate ya dentro del ruido, sin
+  senal de que mas stacking cambie la conclusion — decision confirmada
+  con el usuario). **Candidato final que se lleva a Fase 9+:
+  E20_hist_gradient_boosting (manual)** — AutoGluon no ofrece ventaja
+  neta una vez contado el costo de computo, y el manual gana en
+  interpretabilidad y velocidad.
 - **Commit al dia:** el trabajo de Fase 3 a Fase 7 se commiteo el
   2026-08-31 (`7153148`, 37 archivos) tras confirmacion explicita del
-  usuario. Ya no es un bloqueador para Fase 8.
+  usuario. **Fase 8 (este trabajo) sigue sin commitear** — pedir
+  confirmacion antes de seguir a Fase 9.
 - **Entorno:** creado con `uv` (Python 3.11.9). `uv.lock` generado y
   commiteado.
 
@@ -102,7 +107,62 @@ Otros hallazgos (Fase 1 + Fase 2, no criticos pero a resolver en Fase 3):
 
 ## Ultima sesion
 
-- **Fecha:** 2026-08-31 (Fase 7, sesion continua)
+- **Fecha:** 2026-08-31/09-01 (Fase 8, sesion continua tras cerrar Fase 7)
+- **Que se hizo (Fase 8 — AutoGluon challenger, cerrada):**
+  - Ambiguedad del holdout resuelta primero (ver seccion siguiente,
+    ya commiteada en `9ddfb16`): Fase 8 compara con CV V1 sobre `dev`,
+    no con el holdout congelado.
+  - Extras de AutoGluon instalados (decision confirmada con el
+    usuario): `lightgbm`, `catboost`, `xgboost` — SIN `torch` (sin
+    justificacion experimental clara para un dataset tabular de este
+    tamano, agrega peso/complejidad de dependencia). `uv add lightgbm
+    catboost xgboost`, sin conflictos con el resto del stack.
+  - `src/f1pitstop/models/autogluon_runner.py`: `run_autogluon_group_cv()`
+    reentrena un `TabularPredictor` desde cero en cada uno de los 5
+    folds de CV V1 (mismo protocolo que `evaluation.cv.run_group_cv()`
+    para los candidatos sklearn — confirmado con el usuario: 5-fold
+    completo, no un solo split, para comparacion estadisticamente solida
+    contra los modelos manuales). Cada predictor se entrena en un
+    directorio temporal y se descarta al terminar (no se acumulan GBs de
+    artefactos de AutoGluon por 10 fits exploratorios).
+  - `scripts/phase8_autogluon.py`: reproducible, corre A00
+    (`E10_raw_features`, sin feature engineering) y A01
+    (`E13_full_leakage_safe_features`, Fase 6), `presets="medium_quality"`,
+    `time_limit=120s` por fold, logueado a MLflow (`stage=automl`).
+  - **Resultados:** A00 = 0.813±0.022 ROC-AUC (muy por debajo del
+    manual), **A01 = 0.861±0.024 ROC-AUC** (empata estadisticamente con
+    E20_hist_gradient_boosting de Fase 7, 0.8611 — diferencia +0.0003,
+    dentro del ruido) pero a ~5x el costo de computo por fold (121s
+    AutoGluon vs 25s manual). Guardado en
+    `artifacts/tables/phase8_autogluon_results.csv`.
+  - **Decision confirmada con el usuario: NO correr una segunda pasada
+    `good_quality`.** El spec permite escalar "solo si la primera
+    corrida justifica el costo" — un empate ya dentro del ruido no da
+    senal de que mas stacking cambie la conclusion. Cerrar aqui es
+    coherente con la regla 4 de CLAUDE.md ("nada de MLOps completo").
+  - **Candidato final que avanza a Fase 9+: `E20_hist_gradient_boosting`
+    (manual)** — AutoGluon no ofrece ventaja neta contando el costo de
+    computo; el manual gana en interpretabilidad y velocidad. Este es el
+    resultado central de la pregunta de portafolio (ver `CLAUDE.md`,
+    "Que es esto"): el feature engineering manual (Fase 6) fue el factor
+    dominante (A00 sin el queda 0.048 por debajo), no el algoritmo — el
+    HGB manual y AutoGluon con las mismas features rinden igual.
+  - `tests/test_autogluon_runner.py` (1 test, marcado `slow`, patron del
+    smoke test con `time_limit` corto sobre datos toy). Marker `slow`
+    registrado en `pyproject.toml`. Suite completa: 75 tests, todos
+    pasan. `ruff check .` limpio.
+  - **Subagente `leakage-auditor` invocado antes de cerrar la fase**
+    (CLAUDE.md lo exige explicitamente para Fase 8): **sin hallazgos
+    bloqueantes** (holdout excluido correctamente, target nunca en
+    `feature_cols`, sin fuga entre folds). Dos hallazgos A_REVISAR
+    cerrados en la misma sesion: (1) assert de seguridad
+    `target_col not in feature_cols` agregado a
+    `run_autogluon_group_cv()` + test dedicado; (2) limitacion
+    documentada (README.md, docstring de `autogluon_runner.py`): el
+    split interno de AutoGluon dentro de cada fold V1 externo no es
+    group-aware — no contamina la metrica reportada, pero es una
+    asimetria real frente al modelo manual (que no hace ningun split
+    interno propio).
 - **Que se hizo (Fase 7 — Modelos manuales, cerrada):**
   - `src/f1pitstop/models/manual_models.py`: 3 candidatos sobre el
     feature set `E13_full_leakage_safe_features` (10 columnas, sin
@@ -383,35 +443,33 @@ Otros hallazgos (Fase 1 + Fase 2, no criticos pero a resolver en Fase 3):
 
 ## Proxima accion concreta
 
-1. Ejecutar Fase 8 del spec (AutoGluon challenger). Ver spec seccion 13:
-   - Archivo: `autogluon_runner.py`. Objetivo: benchmark AutoML honesto,
-     el holdout final NUNCA se pasa como `tuning_data`.
-   - Primera corrida: `presets="medium_quality"`, `time_limit` acotado.
-     Segunda corrida (`good_quality` o equivalente) solo si la primera
-     justifica el costo. No exigir `best_quality`.
-   - Entradas: A0 = raw cleaned data, A1 = leakage-safe engineered data
-     (feature set E13 de Fase 6/7).
-   - **Ambiguedad del holdout resuelta (2026-08-31, confirmada con el
-     usuario):** ver `.claude/rules/leakage-and-validation.md` §7. La
-     comparacion AutoGluon vs modelo manual en Fase 8 usa **CV V1 sobre
-     `dev`** (el mismo protocolo que ya uso el modelo manual en Fases
-     4-7), NO el holdout final congelado (`Year==2025`) — ese se toca
-     una unica vez en Fase 13, sobre ambos finalistas por igual. Decidir
-     el ganador de Fase 8 con el holdout hubiera sido una decision de
-     modelado y violado la regla no negociable 6 de CLAUDE.md.
-   - Guardar leaderboard, score_val (CV V1, no holdout), pred_time,
-     fit_time, stack_level, espacio en disco del predictor.
-     `holdout_roc_auc`/`holdout_pr_auc` NO se loguean en A00/A01 (solo
-     en runs finalistas F00/F01, Fase 13 — ver
-     `.claude/rules/experiment-tracking.md`).
-   - MLflow: registrar manualmente (sin autolog magico) preset,
-     time_limit, eval_metric, filas/columnas, leaderboard.csv, CV V1
-     metrics, runtime, path/version del predictor.
-   - Decidir primero si se instalan los extras opcionales de AutoGluon
-     (torch/lightgbm/catboost/xgboost) — ver "Bloqueadores".
-   - Criterio de salida: comparacion manual vs AutoML con la misma
-     particion externa (CV V1) y la misma metrica.
-   - Usar la skill `/new-experiment` para A00/A01.
+1. **Commitear el trabajo de Fase 8** (autogluon_runner.py, phase8_autogluon.py,
+   test_autogluon_runner.py, phase8_autogluon_results.csv, cambios en
+   README.md/HANDOFF.md, extras instalados en pyproject.toml/uv.lock) —
+   pedir confirmacion explicita al usuario primero. Antes de commitear,
+   confirmar que el subagente `leakage-auditor` (invocado al cerrar esta
+   fase) no reporto hallazgos bloqueantes.
+2. Ejecutar Fase 9 del spec (skore). Ver spec seccion 14:
+   - Usarlo ahora que ya hay candidatos serios: `E20_hist_gradient_boosting`
+     (manual, ganador de Fase 7/8, 0.8611 ROC-AUC) y opcionalmente los
+     otros candidatos de Fase 7 (E14/E15/E16, E21) para el
+     `ComparisonReport`.
+   - Funciones objetivo: `evaluate()` con el splitter oficial (V1) cuando
+     el estimador sea compatible; `ComparisonReport` para varios
+     candidatos sklearn; metricas y curvas; timings; permutation
+     importance cuando sea interpretable/viable; checks pertinentes.
+   - **Advertencia del spec:** si `skrub.tabular_pipeline` no es
+     compatible con `skore.evaluate()`, no forzarlo — evaluar ese
+     pipeline con `cross_validate` de sklearn y usar `skore` solo para
+     los reportes visuales a partir de esas predicciones. Documentar
+     como limitacion tecnica, no como fracaso.
+   - Reportes minimos: CV summary, ROC curve, PR curve, calibration
+     curve (si aporta), confusion matrix a un umbral documentado (solo
+     analisis), permutation importance del finalista sklearn.
+   - AutoGluon (A01, Fase 8) NO es un "estimador sklearn" compatible con
+     `evaluate()`/`ComparisonReport` de skore de forma directa — decidir
+     si se incluye solo con sus metricas ya calculadas (fuera de skore)
+     o se omite del `ComparisonReport` y se menciona aparte.
 
 Nota: `notebooks/01_data_audit.ipynb` y `02_eda.ipynb` de la arquitectura
 del spec no se crearon todavia — los criterios de salida de Fase 1 y 2 se
@@ -464,7 +522,7 @@ exige explicitamente como criterio de salida de esa fase.
 | 5 — skrub | **cerrada** | 2026-08-28 | calidad practicamente identica (HGB match exacto, logreg +0.004); skrub adoptado donde reduce codigo, no forzado.|
 | 6 — Feature engineering | **cerrada** | 2026-08-28 | E13 gana con 0.860 ROC-AUC (+0.045 vs E10); `laptime_roll_mean_3` invalidada por ablation por-feature reproducible.|
 | 7 — Modelos manuales | **cerrada** | 2026-08-31 | E20_hist_gradient_boosting (tuneado) gana con 0.8611 ROC-AUC; ExtraTrees tuneado 0.8530; Stint crudo confirmado como necesario (-0.030 sin el).|
-| 8 — AutoGluon challenger | pendiente | | decidir extras opcionales (ver bloqueadores); comparar vs manual con CV V1 (ambiguedad del holdout resuelta, ver `leakage-and-validation.md` §7) |
+| 8 — AutoGluon challenger | **cerrada** | 2026-09-01 | A01 (E13) = 0.861±0.024, empata con manual (0.8611) a ~5x costo de computo; no se corre good_quality. Candidato final: manual (E20). leakage-auditor sin hallazgos bloqueantes (limitacion del split interno de AutoGluon documentada). Trabajo sin commitear todavia |
 | 9 — skore | pendiente | | |
 | 10 — Error analysis | pendiente | | |
 | 11 — MLflow final | pendiente | | |

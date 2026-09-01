@@ -5,6 +5,8 @@ description = "F1 Pit Stop Prediction — leakage-aware ML pipeline vs AutoML (K
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "autogluon-tabular>=1.6.1",
+    "catboost>=1.2.10",
+    "lightgbm>=4.7.0",
     "mlflow>=3.15.2",
     "pandas>=2.3.3",
     "pytest>=9.1.1",
@@ -13,6 +15,7 @@ dependencies = [
     "skops>=0.14.0",
     "skore>=0.25.0",
     "skrub>=0.10.0",
+    "xgboost>=3.2.0",
 ]
 
 [build-system]
@@ -24,6 +27,9 @@ packages = ["src/f1pitstop"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: fits a real model (AutoGluon, etc.) even on toy data — excluir con `-m 'not slow'` para una corrida rapida.",
+]
 
 [tool.ruff]
 line-length = 100

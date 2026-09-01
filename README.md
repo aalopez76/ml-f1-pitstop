@@ -259,3 +259,50 @@ non-monotonic in 81.6% of race groups (Fase 1/2 finding), it still
 carries real predictive signal that `recomputed_stint` doesn't fully
 replace — **kept in the default feature set** (decision closed, no
 further action needed).
+
+## AutoGluon challenger (Fase 8)
+
+Reproducible from `scripts/phase8_autogluon.py`
+(`src/f1pitstop/models/autogluon_runner.py`). AutoGluon
+`TabularPredictor` reentrenado desde cero en cada uno de los 5 folds de
+CV V1 (mismo protocolo group-aware que los modelos manuales de Fase
+4-7) — no el holdout final congelado, que se reserva para la
+evaluacion confirmatoria unica de la Fase 13 (ambiguedad resuelta, ver
+`.claude/rules/leakage-and-validation.md` §7). `presets="medium_quality"`,
+`time_limit=120s` por fold. Extras instalados: `lightgbm`, `catboost`,
+`xgboost` (no `torch` — sin justificacion clara para un dataset tabular
+de este tamano).
+
+| run | input | ROC-AUC (mean±std) | fit/fold | Δ vs manual (E20, 0.8611) |
+|---|---|---|---|---|
+| A00_autogluon_raw | E10 (sin feature engineering) | 0.813 ± 0.022 | 121.3s | −0.048 |
+| A01_autogluon_engineered | E13 (Fase 6) | **0.861 ± 0.024** | 121.4s | **+0.0003** |
+
+**A01 empata estadisticamente con el modelo manual ganador** (la
+diferencia esta muy por debajo de la desviacion estandar entre folds,
+~0.024). El resultado es limpio para la pregunta de portafolio: el
+pipeline manual iguala a AutoML en calidad predictiva, a una fraccion
+del costo de computo (HGB manual ~25s/fold vs AutoGluon ~121s/fold,
+~5x) y con interpretabilidad completa. `A00` (sin la ingenieria de
+features de Fase 6) queda muy por debajo, confirmando que el feature
+engineering manual sigue siendo el factor dominante, no el algoritmo.
+
+**Decision: no se corre una segunda pasada con `good_quality`.** El
+spec permite escalar "solo si la primera corrida justifica el costo" —
+un empate ya dentro del ruido no da una senal clara de que mas stacking
+vaya a cambiar la conclusion, y el spec pide explicitamente no exigir
+`best_quality`. Cerrar aqui es tambien coherente con la regla 4 de
+CLAUDE.md ("nada de MLOps completo").
+
+**Reviewed by the `leakage-auditor` subagent** (read-only, exigido por
+CLAUDE.md antes de cerrar Fase 8) antes de cerrar esta fase: sin
+hallazgos bloqueantes (holdout final excluido correctamente, target
+nunca en `feature_cols`, sin fuga entre folds via el predictor o el
+directorio temporal). **Limitacion conocida documentada** (no
+bloqueante): `TabularPredictor.fit()` hace su propio split/bagging
+interno DENTRO del train de cada fold V1 externo, y ese split interno
+NO es group-aware — no contamina la metrica reportada (el val externo
+solo se toca en `predict_proba`), pero podria hacer que AutoGluon
+optimice su ensamble interno contra una senal ligeramente optimista, la
+misma clase de sesgo que V0 vs V1 cuantifico en Fase 3 (ver
+`src/f1pitstop/models/autogluon_runner.py` para el detalle completo).
