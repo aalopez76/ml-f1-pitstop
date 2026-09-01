@@ -21,18 +21,9 @@
   comparar contra AutoGluon. Ablation de Stint (punto abierto de Fase 6)
   resuelto: quitar `Stint` crudo cuesta -0.030 ROC-AUC, se mantiene en
   el feature set (E13, 10 columnas, sin cambios respecto a Fase 6).
-- **PENDIENTE ANTES DE SEGUIR (arrastrado desde Fase 3, sigue sin
-  resolver):** todo el trabajo de Fase 3 a Fase 7 esta sin commitear
-  (`git status --short` — ver lista completa corriendo el comando;
-  incluye como minimo `README.md`, `artifacts/`, `notebooks/`, `scripts/`,
-  `src/f1pitstop/data/split.py`, `src/f1pitstop/evaluation/`,
-  `src/f1pitstop/features/`, `src/f1pitstop/models/`,
-  `src/f1pitstop/tracking/`, y los `tests/test_*` nuevos). El subagente
-  `leakage-auditor` ya senalo esto como riesgo de reproducibilidad en
-  Fase 3 (un checkout limpio no tendria el holdout congelado ni el
-  historial de MLflow). Commitear antes de seguir a Fase 8 — sigue sin
-  hacerse porque commitear requiere pedirlo explicitamente y no se ha
-  pedido todavia.
+- **Commit al dia:** el trabajo de Fase 3 a Fase 7 se commiteo el
+  2026-08-31 (`7153148`, 37 archivos) tras confirmacion explicita del
+  usuario. Ya no es un bloqueador para Fase 8.
 - **Entorno:** creado con `uv` (Python 3.11.9). `uv.lock` generado y
   commiteado.
 
@@ -472,11 +463,11 @@ exige explicitamente como criterio de salida de esa fase.
 | 0 — Smoke test | **cerrada** | 2026-08-26 | Un unico entorno; fix de MLflow (sqlite) y skops (allowlist) documentados arriba |
 | 1 — Ingesta y auditoria | **cerrada** | 2026-08-26 | Ver `artifacts/reports/data_audit.md`; hallazgo critico de `Stint` no monotono queda abierto para Fase 3 |
 | 2 — EDA dirigido | **cerrada** | 2026-08-26 | Ver `artifacts/reports/eda_report.md`; confirmado que Stint no es artefacto de submuestreo; 10 hipotesis para Fase 3+ |
-| 3 — Validacion y leakage | **cerrada** | 2026-08-27 | V1 (StratifiedGroupKFold por (Race,Year)) elegida como CV oficial; holdout Year==2025 congelado; ver `notebooks/03_leakage_and_validation.ipynb` y `leakage_checklist_fase3.md`. Trabajo sin commitear todavia |
-| 4 — Baselines | **cerrada** | 2026-08-27 | E00=0.500, E01=0.732, E02=0.815 ROC-AUC (V1); MLflow activado; `LapTime (s)` retirada del feature set por defecto (hallazgo de estabilidad, no leakage). Trabajo sin commitear todavia |
-| 5 — skrub | **cerrada** | 2026-08-28 | calidad practicamente identica (HGB match exacto, logreg +0.004); skrub adoptado donde reduce codigo, no forzado. Trabajo sin commitear todavia |
-| 6 — Feature engineering | **cerrada** | 2026-08-28 | E13 gana con 0.860 ROC-AUC (+0.045 vs E10); `laptime_roll_mean_3` invalidada por ablation por-feature reproducible. Trabajo sin commitear todavia |
-| 7 — Modelos manuales | **cerrada** | 2026-08-31 | E20_hist_gradient_boosting (tuneado) gana con 0.8611 ROC-AUC; ExtraTrees tuneado 0.8530; Stint crudo confirmado como necesario (-0.030 sin el). Trabajo sin commitear todavia |
+| 3 — Validacion y leakage | **cerrada** | 2026-08-27 | V1 (StratifiedGroupKFold por (Race,Year)) elegida como CV oficial; holdout Year==2025 congelado; ver `notebooks/03_leakage_and_validation.ipynb` y `leakage_checklist_fase3.md`.|
+| 4 — Baselines | **cerrada** | 2026-08-27 | E00=0.500, E01=0.732, E02=0.815 ROC-AUC (V1); MLflow activado; `LapTime (s)` retirada del feature set por defecto (hallazgo de estabilidad, no leakage).|
+| 5 — skrub | **cerrada** | 2026-08-28 | calidad practicamente identica (HGB match exacto, logreg +0.004); skrub adoptado donde reduce codigo, no forzado.|
+| 6 — Feature engineering | **cerrada** | 2026-08-28 | E13 gana con 0.860 ROC-AUC (+0.045 vs E10); `laptime_roll_mean_3` invalidada por ablation por-feature reproducible.|
+| 7 — Modelos manuales | **cerrada** | 2026-08-31 | E20_hist_gradient_boosting (tuneado) gana con 0.8611 ROC-AUC; ExtraTrees tuneado 0.8530; Stint crudo confirmado como necesario (-0.030 sin el).|
 | 8 — AutoGluon challenger | pendiente | | decidir extras opcionales (ver bloqueadores); resolver ambiguedad sobre uso del holdout (ver "Proxima accion concreta") |
 | 9 — skore | pendiente | | |
 | 10 — Error analysis | pendiente | | |
