@@ -1,0 +1,4 @@
+strategy,roc_auc_mean,roc_auc_std,n_folds,note
+V0_random_kfold,0.8444541992785067,0.0009081852587931778,5,"ignora grupos (Race, Year); baseline optimista de referencia"
+V1_group_kfold,0.8145680784844561,0.022877047930169227,5,"carrera (Race, Year) nunca aparece en train y val a la vez"
+V2_temporal_2022_2023_train_2024_val,0.8391521626027988,,1,demostracion temporal dentro de dev; no usa el holdout final congelado

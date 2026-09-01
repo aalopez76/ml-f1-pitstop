@@ -1,0 +1,3 @@
+run_name,model_family,cv_roc_auc_mean,cv_roc_auc_std,fit_seconds,n_features,mlflow_run_id
+E20_hist_gradient_boosting,hist_gradient_boosting,0.8610546687688133,0.02512394933941799,24.787432050704957,10,84990394d7bf4d0da3ab9d8982419fe0
+E21_extra_trees,extra_trees,0.8529763090166531,0.023030459798800473,300.2493362426758,10,359d54c5d3a14e23a66ac007ddf4a457
