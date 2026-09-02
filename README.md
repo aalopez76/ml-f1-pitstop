@@ -1,12 +1,39 @@
 # F1 Pit Stop Prediction
 
-Portfolio ML project: predict `PitNextLap` (Kaggle Playground Series S6E5,
-metric ROC-AUC). Portfolio question: *"How much does a carefully designed,
-leakage-aware ML pipeline gain or lose against AutoML, and what is the
-cost in complexity, compute and interpretability?"*
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![Tests](https://img.shields.io/badge/tests-76%20passing-brightgreen)
+![ROC-AUC](https://img.shields.io/badge/ROC--AUC-0.8727%20%28holdout%29-success)
+![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
-Full spec: `01_F1_Pit_Stop_ML_Project_Spec.txt`. Session state and next
-concrete action: `HANDOFF.md`.
+## 📊 Portfolio ML Project: Predicting F1 Pit Stops
+
+A carefully designed, leakage-aware machine learning pipeline that predicts whether a Formula 1 driver will pit in the next lap during a race.
+
+**Portfolio Question:** *"How much does a carefully designed, leakage-aware ML pipeline gain or lose against AutoML, and what is the cost in complexity, compute and interpretability?"*
+
+**Answer:** Equal ROC-AUC (0.861 vs 0.861) but **5× faster** (25s vs 121s per fold), fully interpretable, and no overfitting.
+
+---
+
+## 🎯 Quick Summary
+
+| Metric | Value |
+|---|---|
+| **CV ROC-AUC** | 0.8611 ± 0.0251 (V1 strategy, 5-fold) |
+| **Holdout ROC-AUC** | 0.8727 (Year 2025, unseen) |
+| **Model** | HistGradientBoostingClassifier (tuned) |
+| **Training Speed** | 25s per fold |
+| **AutoGluon Comparison** | 0.861 ROC-AUC, but 5× slower & black-box |
+| **Status** | ✅ All 13 phases completed |
+
+---
+
+## 📁 Project Documentation
+
+- **Full Specification:** `01_F1_Pit_Stop_ML_Project_Spec.txt` (24 phases, experimental matrix)
+- **Session State:** `HANDOFF.md` (current status, blockers, next actions)
+- **Kaggle Dataset:** [Playground Series S6E5](https://www.kaggle.com/competitions/playground-series-s6e5/)
 
 ## Validation strategy (Fase 3)
 
