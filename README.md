@@ -338,3 +338,55 @@ configuracion group-aware adicional no trivial en sklearn 1.9).
 **Próximo paso:** artefactos visuales (ROC, PR, calibration curves) se
 agregarán en una iteracion posterior si el tiempo/presupuesto lo
 permite. Métrica final (holdout, Fase 13) será el árbitro definitivo.
+
+## Error analysis (Fase 10)
+
+Reproducible from `scripts/phase10_error_analysis.py`. Segmentación de
+errores OOF (out-of-fold) del candidato E20 para identificar dónde falla
+el modelo, si hay oportunidad de ensemble, y diversidad entre segmentos.
+
+**E20 OOF metrics (dev set, CV V1):**
+- AUC: 0.8620 (vs CV score 0.8611, reproducibilidad confirmada)
+- PR-AUC: 0.5449
+- Total errors: 51,135 / 346,246 (14.8% error rate)
+
+**Performance por segmento (hallazgos clave):**
+
+**1. Por Race (26 eventos):**
+- Mejor: Chinese GP (AUC 0.9406), Saudi Arabian (0.9319), Abu Dhabi (0.9131)
+- Peor: Qatar (0.7674), São Paulo (0.7701), Bahrain (0.7717)
+- Rango: 0.77–0.94 (variación significativa, ~0.17 en AUC)
+
+**2. Por Year (drift temporal):**
+- 2022: AUC 0.8581, pit rate 26.7% (normal)
+- **2023: AUC 0.6668, pit rate 0.96% (drift severo)**
+- 2024: AUC 0.8644, pit rate 29.5% (normal)
+- Conclusión: 2023 es un anomalía de los datos sintéticos (confirmado en Fase 3).
+
+**3. Por Compound (neumático):**
+- Mejor: MEDIUM (AUC 0.8859, pit 8.6%)
+- Peor: HARD (AUC 0.8014, pit 28.9%)
+- Patrón: compuestos "blandos" (MEDIUM, WET) generan menos pit stops y mejor AUC.
+
+**4. Por Stint (rango):**
+- Mejor: Stint 1–2 (AUC 0.8733, error 13.6%)
+- Peor: Stint 3–4 (AUC 0.8178, error 20.2%)
+- Interpretación: neumáticos frescos → predicción más fácil.
+
+**5. Por Position (rango de posición):**
+- Adelante (1–4): AUC 0.8822
+- Atrás (16–20): AUC 0.8262
+- Patrón consistente: posiciones de adelante son más predecibles.
+
+**6. Por RaceProgress (fase de carrera):**
+- Temprana (0–33%): AUC 0.8719, pit 11.0%
+- Media (33–67%): AUC 0.8137, pit 31.1% (pico de pit stops)
+- Tardía (67–100%): AUC 0.8446, pit 15.9%
+- Conclusión: fase media es el cuello de botella (decisions tácticas complejas).
+
+**Oportunidad de ensemble:** diversidad de errores existe (segmentos con
+AUC 0.77–0.94), pero la arquitectura es simple (1 modelo manual ganador)
+y el spec no justifica ensemble sin evidencia explícita. No se construye
+ensemble. Si en Fase 13 el holdout confirma que el modelo generaliza (AUC
+~0.86), la pregunta de portafolio está respondida: el manual iguala
+AutoML sin ensemble.
