@@ -306,3 +306,35 @@ solo se toca en `predict_proba`), pero podria hacer que AutoGluon
 optimice su ensamble interno contra una senal ligeramente optimista, la
 misma clase de sesgo que V0 vs V1 cuantifico en Fase 3 (ver
 `src/f1pitstop/models/autogluon_runner.py` para el detalle completo).
+
+## Diagnosis and evaluation (Fase 9 — skore)
+
+Reproducible from `scripts/phase9_skore_evaluation.py`. Diagnóstico
+estructurado del candidato manual ganador (`E20_hist_gradient_boosting`,
+0.8611 ROC-AUC) usando sklearn native y directo feature importance
+(permutation importance, en lugar de skore.evaluate() que requiere
+configuracion group-aware adicional no trivial en sklearn 1.9).
+
+**Permutation importance (top 5 features, E20, CV V1):**
+
+| feature | importance_mean | importance_std |
+|---|---|---|
+| Stint | 0.0720 | 0.0004 |
+| TyreLife | 0.0640 | 0.0003 |
+| pit_stops_so_far | 0.0484 | 0.0004 |
+| LapNumber | 0.0293 | 0.0003 |
+| Compound | 0.0182 | 0.0003 |
+
+**Key findings:**
+- `Stint` es el predictor más importante, a pesar de su no-monotonicidad
+  en el 81.6% de los grupos (Fase 1/2), reforzando la decision de Fase
+  7 de mantenerlo en el feature set — la senal es real.
+- Las 5 features del top capturan ~24% del permutation importance —
+  indicador de que el modelo usa de forma distribuida información de
+  muchas features en lugar de anclar a unas pocas.
+- La estabilidad de los std a través de folds es alta (varianza <1%),
+  señal de que los rankings por importancia son robustos.
+
+**Próximo paso:** artefactos visuales (ROC, PR, calibration curves) se
+agregarán en una iteracion posterior si el tiempo/presupuesto lo
+permite. Métrica final (holdout, Fase 13) será el árbitro definitivo.

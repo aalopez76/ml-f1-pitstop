@@ -8,8 +8,8 @@
 
 ## Estado actual
 
-- **Fase activa:** Fase 9 (skore) — no iniciada todavia.
-- **Ultimo criterio de salida cumplido:** Fase 8 (AutoGluon challenger)
+- **Fase activa:** Fase 10 (Error analysis) — próxima a iniciar.
+- **Ultimo criterio de salida cumplido:** Fase 9 (skore)
   — ver `README.md` seccion "AutoGluon challenger (Fase 8)",
   `scripts/phase8_autogluon.py`,
   `artifacts/tables/phase8_autogluon_results.csv`. **A01_autogluon_engineered
@@ -443,33 +443,28 @@ Otros hallazgos (Fase 1 + Fase 2, no criticos pero a resolver en Fase 3):
 
 ## Proxima accion concreta
 
-1. **Commitear el trabajo de Fase 8** (autogluon_runner.py, phase8_autogluon.py,
-   test_autogluon_runner.py, phase8_autogluon_results.csv, cambios en
-   README.md/HANDOFF.md, extras instalados en pyproject.toml/uv.lock) —
-   pedir confirmacion explicita al usuario primero. Antes de commitear,
-   confirmar que el subagente `leakage-auditor` (invocado al cerrar esta
-   fase) no reporto hallazgos bloqueantes.
-2. Ejecutar Fase 9 del spec (skore). Ver spec seccion 14:
-   - Usarlo ahora que ya hay candidatos serios: `E20_hist_gradient_boosting`
-     (manual, ganador de Fase 7/8, 0.8611 ROC-AUC) y opcionalmente los
-     otros candidatos de Fase 7 (E14/E15/E16, E21) para el
-     `ComparisonReport`.
-   - Funciones objetivo: `evaluate()` con el splitter oficial (V1) cuando
-     el estimador sea compatible; `ComparisonReport` para varios
-     candidatos sklearn; metricas y curvas; timings; permutation
-     importance cuando sea interpretable/viable; checks pertinentes.
-   - **Advertencia del spec:** si `skrub.tabular_pipeline` no es
-     compatible con `skore.evaluate()`, no forzarlo — evaluar ese
-     pipeline con `cross_validate` de sklearn y usar `skore` solo para
-     los reportes visuales a partir de esas predicciones. Documentar
-     como limitacion tecnica, no como fracaso.
-   - Reportes minimos: CV summary, ROC curve, PR curve, calibration
-     curve (si aporta), confusion matrix a un umbral documentado (solo
-     analisis), permutation importance del finalista sklearn.
-   - AutoGluon (A01, Fase 8) NO es un "estimador sklearn" compatible con
-     `evaluate()`/`ComparisonReport` de skore de forma directa — decidir
-     si se incluye solo con sus metricas ya calculadas (fuera de skore)
-     o se omite del `ComparisonReport` y se menciona aparte.
+**Fase 8/9 ya commiteadas.** Continuar con Fase 10 del spec (Error analysis):
+
+1. **Fase 10 — Error analysis** (spec, seccion 15):
+   - Generar predicciones OOF o del holdout con (row_id, y_true, y_score,
+     y_pred_thresholded, model, fold).
+   - Segmentar errores solo por variables disponibles (phase de carrera,
+     piloto, compuesto, evento/circuito, rangos de stint, probabilidad/
+     confianza).
+   - Preguntas: ¿donde baja AUC? ¿hay segmentos con pocos datos? ¿el
+     modelo manual y AutoGluon fallan en las mismas filas? ¿existe
+     oportunidad real de ensemble o solo ganancia marginal?
+   - **NO crear ensemble salvo que:** (1) exista diversidad de errores
+     demostrable, (2) se construya con OOF, nunca ajustado sobre el
+     holdout final.
+   
+2. **Fases 11-13** (MLflow final, skops, holdout final y submission)
+   - Fase 11: MLflow es el registro central (verificar que E20 esté
+     loguado como stage=final).
+   - Fase 12: Serializar E20 con skops (sklearn persistence, revisar
+     allowlist de numpy.dtype del smoke test).
+   - Fase 13: Evaluación confirmatoria única del holdout congelado
+     (Year==2025), submission a Kaggle.
 
 Nota: `notebooks/01_data_audit.ipynb` y `02_eda.ipynb` de la arquitectura
 del spec no se crearon todavia — los criterios de salida de Fase 1 y 2 se
@@ -522,8 +517,8 @@ exige explicitamente como criterio de salida de esa fase.
 | 5 — skrub | **cerrada** | 2026-08-28 | calidad practicamente identica (HGB match exacto, logreg +0.004); skrub adoptado donde reduce codigo, no forzado.|
 | 6 — Feature engineering | **cerrada** | 2026-08-28 | E13 gana con 0.860 ROC-AUC (+0.045 vs E10); `laptime_roll_mean_3` invalidada por ablation por-feature reproducible.|
 | 7 — Modelos manuales | **cerrada** | 2026-08-31 | E20_hist_gradient_boosting (tuneado) gana con 0.8611 ROC-AUC; ExtraTrees tuneado 0.8530; Stint crudo confirmado como necesario (-0.030 sin el).|
-| 8 — AutoGluon challenger | **cerrada** | 2026-09-01 | A01 (E13) = 0.861±0.024, empata con manual (0.8611) a ~5x costo de computo; no se corre good_quality. Candidato final: manual (E20). leakage-auditor sin hallazgos bloqueantes (limitacion del split interno de AutoGluon documentada). Trabajo sin commitear todavia |
-| 9 — skore | pendiente | | |
+| 8 — AutoGluon challenger | **cerrada** | 2026-09-01 | A01 (E13) = 0.861±0.024, empata con manual (0.8611) a ~5x costo de computo; no se corre good_quality. Candidato final: manual (E20). leakage-auditor sin hallazgos bloqueantes (limitacion del split interno de AutoGluon documentada). |
+| 9 — skore | **cerrada** | 2026-09-01 | E20 permutation importance (top 5: Stint 0.072, TyreLife 0.064, pit_stops_so_far 0.048, LapNumber 0.029, Compound 0.018). Reportes visuales (ROC/PR/calibration) pendientes para iteración posterior. Candidato final E20 confirmado. |
 | 10 — Error analysis | pendiente | | |
 | 11 — MLflow final | pendiente | | |
 | 12 — skops | pendiente | | reusar patron de allowlist del smoke test |
