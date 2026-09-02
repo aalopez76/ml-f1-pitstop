@@ -465,14 +465,13 @@ interpretabilidad y costo computacional.
 - MLflow experiment: `f1_pitstop`, stage=final, tags/metricas completas
 - Tests: 76 tests pasan, ruff limpio, sin deuda tecnica
 
-**CRÍTICO — Siguiente sesión (no completado):**
-1. **Crear repositorio en GitHub** (público):
-   - Iniciar como repositorio nuevo en github.com/aalopez/ml-f1-pitstop
-     (o nombre similar)
-   - Hacer push de todo el código actual (git remote add origin ..., git push)
-   - Agregar description, README principal, y tags del proyecto
-   - **COMPARTIR EL LINK con Claude Code** al inicio de la próxima sesión
-   - El link será la URL de referencia para el portafolio
+**GitHub Deployment (COMPLETADO — sesión 2026-09-02):**
+✅ Repositorio público creado: https://github.com/aalopez76/ml-f1-pitstop
+✅ Todo el código pusheado (167 commits, 2.91 MiB)
+✅ README mejorado con badges y métricas finales
+✅ Topics agregados: machine-learning, formula1, kaggle, scikit-learn, autogluon, feature-engineering, portfolio-project, mlflow
+✅ Descripción corta agregada al repo
+✅ Master branch sincronizado con GitHub
 
 **Opcional (no requerido por spec, extra):**
 - Revisar holdout performance final en Kaggle (solo con credenciales)
