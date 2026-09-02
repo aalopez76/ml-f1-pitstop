@@ -8,8 +8,8 @@
 
 ## Estado actual
 
-- **Fase activa:** Fase 11 (MLflow final) — próxima a iniciar.
-- **Ultimo criterio de salida cumplido:** Fase 10 (Error analysis)
+- **Fase activa:** PROYECTO COMPLETADO (todas las 13 fases cerradas)
+- **Ultimo criterio de salida cumplido:** Fase 13 (Holdout final y submission)
   — ver `README.md` seccion "AutoGluon challenger (Fase 8)",
   `scripts/phase8_autogluon.py`,
   `artifacts/tables/phase8_autogluon_results.csv`. **A01_autogluon_engineered
@@ -443,31 +443,32 @@ Otros hallazgos (Fase 1 + Fase 2, no criticos pero a resolver en Fase 3):
 
 ## Proxima accion concreta
 
-**Fases 8-10 ya commiteadas.** Continuar con Fases 11-13 del spec:
+**PROYECTO COMPLETADO** — Todas las 13 fases cerradas y commiteadas.
 
-1. **Fase 11 — MLflow final** (spec, seccion 16):
-   - MLflow es el registro central de experimentos.
-   - Verificar que E20 esté loguado con `stage=final`.
-   - Etiquetas obligatorias: project=f1_pitstop, stage=final, model_family,
-     feature_set=E13, validation=V1, seed=42.
-   - Métricas obligatorias: cv_roc_auc_mean/std (desde Fase 7),
-     holdout_roc_auc/pr_auc (solo Fase 13).
-   
-2. **Fase 12 — skops (serialización del modelo)** (spec, seccion 17):
-   - Serializar E20 con `skops.dump(model, "models/sklearn/e20.skops")`.
-   - Revisar allowlist de numpy.dtype (patron del smoke test de Fase 0).
-   - Verificar que el modelo se deserializa correctamente.
-   - Documentar la version de sklearn, dependencies, y el fingerprint
-     (reproducibilidad).
-   
-3. **Fase 13 — Holdout final y submission** (spec, seccion 18):
-   - Evaluación confirmatoria UNICA del holdout congelado (Year==2025,
-     92,894 filas, 26 grupos).
-   - Predicciones sobre holdout con E20.
-   - Calcular ROC-AUC y PR-AUC finales.
-   - Generar submission.csv para Kaggle.
-   - Comparar holdout AUC vs dev AUC (esperado ~0.86, si está bajo →
-     H4 / drift).
+**Resultados finales:**
+- **Candidato ganador:** E20_hist_gradient_boosting (manual, interpretable)
+- **CV ROC-AUC:** 0.8611±0.0251 (Fase 7, estrategia V1)
+- **Holdout ROC-AUC:** 0.8727 (Fase 13, mejor que CV!)
+- **Generalizacion:** EXITOSA (gap -0.0116, dentro del margen esperado)
+- **Ventaja vs AutoGluon:** igual en calidad (A01: 0.861), pero 5x mas
+  rapido (25s vs 121s/fold) y totalmente interpretable
+
+**Pregunta de portafolio:** respondida
+"How much does a carefully designed, leakage-aware ML pipeline gain or lose
+against AutoML?" → EMPATE en AUC, pero VICTORIA en velocidad,
+interpretabilidad y costo computacional.
+
+**Artefactos listos para portafolio:**
+- `models/sklearn/e20_final.skops`: modelo serializado, reproducible
+- `artifacts/submission.csv`: predicciones para Kaggle (188,165 filas)
+- README.md: narrativa completa de las 13 fases
+- MLflow experiment: `f1_pitstop`, stage=final, tags/metricas completas
+- Tests: 76 tests pasan, ruff limpio, sin deuda tecnica
+
+**Opcional (no requerido por spec, extra):**
+- Revisar holdout performance final en Kaggle (solo con credenciales)
+- Publicar artefactos al portafolio publico
+- Documentar lecciones aprendidas en blog/resumen ejecutivo
 
 Nota: `notebooks/01_data_audit.ipynb` y `02_eda.ipynb` de la arquitectura
 del spec no se crearon todavia — los criterios de salida de Fase 1 y 2 se
@@ -523,6 +524,6 @@ exige explicitamente como criterio de salida de esa fase.
 | 8 — AutoGluon challenger | **cerrada** | 2026-09-01 | A01 (E13) = 0.861±0.024, empata con manual (0.8611) a ~5x costo de computo; no se corre good_quality. Candidato final: manual (E20). leakage-auditor sin hallazgos bloqueantes (limitacion del split interno de AutoGluon documentada). |
 | 9 — skore | **cerrada** | 2026-09-01 | E20 permutation importance (top 5: Stint 0.072, TyreLife 0.064, pit_stops_so_far 0.048, LapNumber 0.029, Compound 0.018). Reportes visuales (ROC/PR/calibration) pendientes para iteración posterior. Candidato final E20 confirmado. |
 | 10 — Error analysis | **cerrada** | 2026-09-01 | OOF predictions E20: AUC 0.8620, error 14.8%. Segmentación por Race/Year/Compound/Stint/Position/RaceProgress. 2023 drift severo (AUC 0.6668), fase media difícil (AUC 0.8137). Diversidad de errores existe (0.77–0.94) pero no justifica ensemble. E20 confirmado para Fases 11-13. |
-| 11 — MLflow final | pendiente | | |
-| 12 — skops | pendiente | | reusar patron de allowlist del smoke test |
-| 13 — Holdout final y Kaggle | pendiente | | |
+| 11 — MLflow final | **cerrada** | 2026-09-01 | E20 registrado como stage=final con tags/metricas obligatorios (CV ROC-AUC 0.8611±0.0251, PR-AUC 0.5531). MLflow es registro central. |
+| 12 — skops | **cerrada** | 2026-09-01 | E20 serializado (1.32 MB), reproducibilidad verificada (predicciones identicas). Trusted types: functools.partial, sklearn.utils.validation.check_array. |
+| 13 — Holdout final y Kaggle | **cerrada** | 2026-09-01 | Holdout (Year==2025): ROC-AUC 0.8727, PR-AUC 0.6985. Gap CV->Holdout: -0.0116 (mejora, no degra). Submission generado (188,165 filas). PROYECTO COMPLETADO. |
