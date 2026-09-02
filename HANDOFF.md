@@ -465,10 +465,20 @@ interpretabilidad y costo computacional.
 - MLflow experiment: `f1_pitstop`, stage=final, tags/metricas completas
 - Tests: 76 tests pasan, ruff limpio, sin deuda tecnica
 
+**CRÍTICO — Siguiente sesión (no completado):**
+1. **Crear repositorio en GitHub** (público):
+   - Iniciar como repositorio nuevo en github.com/aalopez/ml-f1-pitstop
+     (o nombre similar)
+   - Hacer push de todo el código actual (git remote add origin ..., git push)
+   - Agregar description, README principal, y tags del proyecto
+   - **COMPARTIR EL LINK con Claude Code** al inicio de la próxima sesión
+   - El link será la URL de referencia para el portafolio
+
 **Opcional (no requerido por spec, extra):**
 - Revisar holdout performance final en Kaggle (solo con credenciales)
-- Publicar artefactos al portafolio publico
+- Publicar artefactos al portafolio publico (figuras, modelo, notebooks)
 - Documentar lecciones aprendidas en blog/resumen ejecutivo
+- Agregar badges (tests, ruff, Python version) al README publico de GitHub
 
 Nota: `notebooks/01_data_audit.ipynb` y `02_eda.ipynb` de la arquitectura
 del spec no se crearon todavia — los criterios de salida de Fase 1 y 2 se
