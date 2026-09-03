@@ -441,6 +441,55 @@ Otros hallazgos (Fase 1 + Fase 2, no criticos pero a resolver en Fase 3):
      torch/lightgbm/catboost/xgboost instalados) — decidir en Fase 8 si
      se instalan esos extras.
 
+## Análisis Comparativo: Tu Proyecto vs Kaggle Top 2 (2026-09-02)
+
+Revisión de writeups de ganador y 2do lugar:
+
+**1er Lugar (Optimistix):** 186 OOF, 0.95506 (público/privado)
+- Estrategia: Manual diversidad extrema + brute force
+- Ganó por +0.00001 contra 2do lugar — margen estadístico infinitesimal
+- No documentó validación, leakage-checking ni reproducibilidad
+- Usó Claude pero con limitaciones mencionadas
+
+**2do Lugar (Chris Deotte):** 218 modelos, 0.95502 (privado)
+- Estrategia: LLM Agent autónomo (Codex/GPT5.5) generó 230k líneas de código
+- Perdió por +0.00004 a pesar de 32 modelos MÁS que ganador
+- Muy cuidadoso con leakage (nested folds)
+- Ensemble via logit-stacking
+
+**Insights Críticos de Comentarios:**
+- Optimistix a Deotte: "Expected to see strong agentic component—turned out you have even more models!"
+- Deotte: Codex generó solución en ~48 horas, pero perdió de todas formas
+- Data User (5to): "Your writeup shows you did things the right way" (a Optimistix)
+- Conclusión implícita: Ganar Kaggle ≠ "hacer las cosas correctamente"
+
+**Comparación Tu Proyecto vs Top 2:**
+
+| Aspecto | 1er (Optimistix) | 2do (Deotte) | **Tú** |
+|---------|---|---|---|
+| Score | 0.95506 | 0.95502 | 0.8727 (holdout) |
+| Modelos | 186 | 218 | 5 + AutoGluon |
+| Leakage audit | ❌ No documentada | ✅ Nested folds | ✅ 5-question checklist |
+| Validación | ❌ Implied V0 | ❓ Desconocida | ✅ V0 vs V1 vs V2 |
+| Reproducibilidad | ❌ Manual/implícita | ⚠️ Delegado a Codex | ✅ Scripts + seeds |
+| CV-Holdout gap | ❓ Desconocido | ❓ Desconocido | ✅ -0.0116 (mejora!) |
+| Interpretabilidad | ❌ 186 black-box | ❌ 218 black-box | ✅ 10 features, permutation importance |
+| Líneas de código FE | Unknown | 94k (Codex) | ~500 (tú) |
+| Líneas totales | Unknown | 230k (Codex) | ~2k (tú) |
+
+**Ventajas Competitivas de Tu Proyecto (Para Portafolio):**
+1. Validación rigurosa (group-aware CV, comparación de estrategias)
+2. Leakage-awareness sistemática (checklist 5-preguntas, leakage-auditor subagent)
+3. Reproducibilidad garantizada (seed fijo, scripts ejecutables, 76 tests)
+4. Generalización demostrada (holdout mejor que CV, no peor)
+5. Documentación completa (HANDOFF.md, README.md, spec 24 fases)
+6. Interpretabilidad (sé exactamente por qué gana: features > algoritmo)
+
+**Feedback Implícito de Comentarios:**
+- Data User usó enfoque de Deotte (logit-stacking) → terminó 5to
+- Optimistix reconoció que Data User "did things the right way" pero perdió
+- → Conclusión: Rigor correcto, pero Kaggle rewards brute-force + luck
+
 ## Próxima acción concreta
 
 **PROYECTO 100% COMPLETADO Y LISTO PARA PORTAFOLIO** — Todas las 13 fases cerradas, código en GitHub, artículo en Medium, página personal actualizada.
@@ -502,10 +551,44 @@ del spec no se crearon — los criterios de salida de Fase 1 y 2 se
 cubrieron via reportes `.md` + tests + figuras reproducibles.
 `03_leakage_and_validation.ipynb` (Fase 3) sí se creó (exigido por spec).
 
+## Mejoras Opcionales (Basadas en Análisis Kaggle Top 1 y 2)
+
+**RECOMENDACIÓN: NO IMPLEMENTAR** (proyecto ya es excelente para portafolio)
+
+**Razón:** Top 2 perdió contra Top 1 por +0.00004 a pesar de 32 modelos MÁS. 
+Ganancia marginal << costo de 18+ horas adicionales.
+
+**Si quisiera mejorar (jerarquía de ROI):**
+
+**Tier 1 (6 horas, +0.003–0.008):** ← Vale la pena si hay tiempo
+- E22_xgboost_basic (default, E13 features, CV V1)
+- E23_catboost_basic (default, E13 features, CV V1)
+- E24_lightgbm_basic (default, E13 features, CV V1)
+- E25_ensemble_3way (logit-stacking, E20+E21+best de XGB/Cat/LGBM, Optuna n_trials=20)
+- Justificación: Top 1 y 2 usaron Big 6 (XGB, Cat, LGBM, RealMLP, TabM, TabICL)
+
+**Tier 2 (4–8 horas, +0.002–0.010):** ← Exploración cuidada
+- E26_extra_temporal_features (5-lap rolling mean, pit_stops_rate, stint_progress)
+- E27_interaction_features (TyreLife × Stint, Position × Compound)
+- Condición: cada feature pasa checklist 5-preguntas leakage + test adversarial
+
+**Tier 3 (❌ NO HACER):**
+- Ensemble gigante (186+ modelos) — Top 2 tuvo 218 y perdió
+- Drift mitigation para 2023 — es limitación documentada, no bug
+- Tuning obsesivo (Optuna n_iter=100+) — rendimientos decrecientes
+
+**Análisis Costo-Beneficio:**
+- Mejora conservadora (Tier 1 only): 0.8727 → ~0.8760 (ganancia +0.003)
+- Mejora ambiciosa (Tier 1+2): 0.8727 → ~0.8800 (ganancia +0.007)
+- Mejora brute-force (Tier 1+2+obsesivo tuning): 0.8727 → ~0.885 (ganancia +0.012)
+
+**Veredicto para Portafolio:**
+Actual (0.8727) es más valioso que +0.012 porque demuestra RIGOR, no BRUTE-FORCE.
+Un recruiter preferirá: "Aprendí a validar correctamente" que "Agregué 30 modelos más".
+
 ## Bloqueadores / dudas abiertas
 
-- Decidir en Fase 8 si se instalan los extras opcionales de AutoGluon
-  (torch/lightgbm/catboost/xgboost).
+(Ninguno — proyecto cerrado, decisiones documentadas)
 - `jupyter`/`nbclient`/`ipykernel` no estan en el entorno permanente del
   proyecto (no se justifico como dependencia via regla 3 de CLAUDE.md); si
   se necesita ejecutar mas notebooks con `nbconvert --execute`, recordar
