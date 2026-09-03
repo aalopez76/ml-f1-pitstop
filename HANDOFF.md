@@ -441,9 +441,9 @@ Otros hallazgos (Fase 1 + Fase 2, no criticos pero a resolver en Fase 3):
      torch/lightgbm/catboost/xgboost instalados) — decidir en Fase 8 si
      se instalan esos extras.
 
-## Proxima accion concreta
+## Próxima acción concreta
 
-**PROYECTO COMPLETADO** — Todas las 13 fases cerradas y commiteadas.
+**PROYECTO 100% COMPLETADO Y LISTO PARA PORTAFOLIO** — Todas las 13 fases cerradas, código en GitHub, artículo en Medium, página personal actualizada.
 
 **Resultados finales:**
 - **Candidato ganador:** E20_hist_gradient_boosting (manual, interpretable)
@@ -465,25 +465,36 @@ interpretabilidad y costo computacional.
 - MLflow experiment: `f1_pitstop`, stage=final, tags/metricas completas
 - Tests: 76 tests pasan, ruff limpio, sin deuda tecnica
 
-**GitHub Deployment (COMPLETADO — sesión 2026-09-02):**
+**GitHub & Portafolio Deployment (COMPLETADO — sesión 2026-09-02):**
 ✅ Repositorio público creado: https://github.com/aalopez76/ml-f1-pitstop
-✅ Todo el código pusheado (167 commits, 2.91 MiB)
+✅ Todo el código pusheado (168 commits finales, 2.91 MiB)
 ✅ README mejorado con badges y métricas finales
 ✅ Topics agregados: machine-learning, formula1, kaggle, scikit-learn, autogluon, feature-engineering, portfolio-project, mlflow
 ✅ Descripción corta agregada al repo
 ✅ Master branch sincronizado con GitHub
+✅ Proyecto agregado a página personal: https://aalopez76.github.io/projects/F1_Pit_Stop_ML/
+✅ Medium post publicado: https://medium.com/@aalpzp/how-i-built-an-f1-pit-stop-predictor-andtl-dr-68c3fe2b1cb6
+  - Título: "How I Built an F1 Pit Stop Predictor — And Why It Beats AutoML Without Trying"
+  - 2,500+ palabras, narrativa completa
+  - Topics: machine-learning, AutoML, Kaggle, data-science
+  - Link a GitHub incluido en el post
 
-**Opcional (no requerido por spec, extra):**
-- Revisar holdout performance final en Kaggle (solo con credenciales)
-- Publicar artefactos al portafolio publico (figuras, modelo, notebooks)
-- Documentar lecciones aprendidas en blog/resumen ejecutivo
-- Agregar badges (tests, ruff, Python version) al README publico de GitHub
+**Lecciones aprendidas — Documentadas en:**
+- Medium post (narrativa completa, 5-min read)
+- GitHub README (especificación técnica, resultados)
+- Página personal (integración con portafolio)
+
+**Artefactos listos para portafolio:**
+- Modelo serializado: `models/sklearn/e20_final.skops` (1.32 MB, reproducible)
+- Submission para Kaggle: `artifacts/submission.csv`
+- MLflow experiment: `f1_pitstop`, 21 runs, stage=final completo
+- Tests: 76 tests pasan, ruff limpio, sin deuda tecnica
+- Documentación: README.md (13 fases), HANDOFF.md (estado actual), spec completa
 
 Nota: `notebooks/01_data_audit.ipynb` y `02_eda.ipynb` de la arquitectura
-del spec no se crearon todavia — los criterios de salida de Fase 1 y 2 se
-cubrieron via reportes `.md` + tests + figuras, que son reproducibles.
-`03_leakage_and_validation.ipynb` (Fase 3) si se creo, porque el spec lo
-exige explicitamente como criterio de salida de esa fase.
+del spec no se crearon — los criterios de salida de Fase 1 y 2 se
+cubrieron via reportes `.md` + tests + figuras reproducibles.
+`03_leakage_and_validation.ipynb` (Fase 3) sí se creó (exigido por spec).
 
 ## Bloqueadores / dudas abiertas
 
