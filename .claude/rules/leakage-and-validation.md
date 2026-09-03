@@ -94,3 +94,32 @@ hipotesis por defecto es drift entre el dataset sintetico y el original
 se reentrenar ni se modifica el modelo para mejorar el score de Kaggle
 despues de haberlo visto — eso es fuga de informacion del propio proceso
 de evaluacion.
+
+## 9. Candidatos que surgen DESPUES de la Fase 13
+
+La Fase 13 es la evaluacion confirmatoria del holdout — "una unica vez"
+(seccion 3) significa una unica vez en la vida del proyecto, no una vez
+por candidato ni una vez por fase. Si una fase posterior (p.ej. Fase 14+)
+descubre o construye un candidato nuevo que supera a los finalistas
+originales en CV, **eso NO reabre el holdout**: ni para seleccionar ese
+candidato, ni para verificar cualquier propiedad suya (incluida la
+estabilidad de feature importance via permutation importance, que
+requiere volver a correr el modelo sobre las filas del holdout).
+
+**Ambiguedad resuelta (2026-09-02, confirmada con el usuario antes de
+empezar Fase 14):** esto se aplica incluso cuando el analisis parece "solo
+diagnostico" y no "decision de modelado" en sentido estricto — correr
+`permutation_importance()` sobre el holdout es una nueva inferencia del
+modelo sobre esas filas, y la seccion 3 no distingue entre usar el
+holdout para *decidir* y usar el holdout para *medir algo mas*. Ambos
+casos violan "se evalua una unica vez".
+
+Consecuencia practica: cualquier fase posterior a la 13 que compare
+candidatos nuevos (manuales, AutoML, ensembles) se decide y se cierra
+enteramente sobre CV V1 en `dev`, igual que las Fases 4-7. Si el candidato
+ganador de esa fase reemplazara al finalista de Fase 13 en un
+hipotetico despliegue real, la evaluacion confirmatoria en datos nunca
+vistos tendria que venir de un holdout NUEVO (otro corte temporal, otra
+temporada), no de reabrir `Year==2025` — eso es trabajo fuera de alcance
+de este proyecto de portafolio, no algo que se resuelva "reutilizando" el
+holdout existente.

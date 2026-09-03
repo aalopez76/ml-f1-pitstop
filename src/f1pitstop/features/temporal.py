@@ -178,3 +178,58 @@ UNSTABLE_TEMPORAL_FEATURE_NAMES = ["laptime_roll_mean_3"]
 # HGB baseline por si solas: laptime_delta_prev +0.005, laps_since_last_pit
 # +0.024 ROC-AUC sobre E10).
 TEMPORAL_FEATURE_NAMES = ["laptime_delta_prev", "laps_since_last_pit"]
+
+
+def add_phase14_candidate_features(
+    df: pd.DataFrame, group_cols=FEATURE_GROUP_COLS, order_col=ORDER_COL
+) -> pd.DataFrame:
+    """Familia "candidatas Fase 14" (Tier 2 del framework de seleccion de
+    modelos, ver `artifacts/reports/model_selection_framework.md`): 2
+    features exploratorias, cada una sujeta al mismo ablation individual
+    reproducible que ya se aplico a la familia "temporal" en Fase 6 — no
+    se asume que ayudan solo por pasar el checklist de leakage.
+    Requiere `LapTime_s_winsorized` y `pit_stops_so_far` ya calculados
+    (llamar `add_winsorized_laptime()` y `add_basic_domain_features()`
+    primero).
+
+    - `laptime_roll_mean_5`: igual que `laptime_roll_mean_3` (Fase 6,
+      excluida por inestable, ver `UNSTABLE_TEMPORAL_FEATURE_NAMES`) pero
+      con ventana de 5 vueltas en vez de 3 — hipotesis: una ventana mas
+      ancha promedia mas ruido de vuelta a vuelta y podria ser menos
+      inestable entre carreras bajo V1. `shift(1)` SIEMPRE antes del
+      `rolling` (regla de oro, seccion 5 de leakage-and-validation.md):
+      para la fila `t` usa `LapTime_s_winsorized` de `t-1` .. `t-5`, nunca
+      de `t` en adelante.
+    - `pit_stops_rate_last3`: tasa de pit stops en las hasta 3 vueltas
+      VISIBLES anteriores a `t` (`shift(1)` antes de `rolling(3).mean()`
+      sobre `PitStop`, que ya es 0/1 leakage-safe segun el checklist de
+      Fase 3 — su media movil hereda esa misma garantia). NaN en la
+      primera vuelta VISIBLE de cada grupo (no hay `t-1`), igual criterio
+      que `laptime_delta_prev` — es un NaN esperado, no un bug; los
+      candidatos que no soportan NaN nativo (LogisticRegression,
+      ExtraTrees) lo imputan con mediana dentro del Pipeline, igual que ya
+      hacen con `laptime_delta_prev`.
+    """
+    if "LapTime_s_winsorized" not in df.columns:
+        raise ValueError(
+            "Falta 'LapTime_s_winsorized'; llamar add_winsorized_laptime() primero."
+        )
+    if "pit_stops_so_far" not in df.columns:
+        raise ValueError(
+            "Falta 'pit_stops_so_far'; llamar add_basic_domain_features() primero."
+        )
+
+    out = _sorted_by_group(df, group_cols, order_col)
+    grp_cols = list(group_cols)
+
+    out["laptime_roll_mean_5"] = out.groupby(grp_cols)["LapTime_s_winsorized"].transform(
+        lambda s: s.shift(1).rolling(5, min_periods=1).mean()
+    )
+    out["pit_stops_rate_last3"] = out.groupby(grp_cols)["PitStop"].transform(
+        lambda s: s.shift(1).rolling(3, min_periods=1).mean()
+    )
+
+    return out.reindex(df.index)
+
+
+PHASE14_CANDIDATE_FEATURE_NAMES = ["laptime_roll_mean_5", "pit_stops_rate_last3"]

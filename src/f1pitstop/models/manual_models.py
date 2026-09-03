@@ -20,6 +20,8 @@ LogisticRegression y ExtraTrees no soportan NaN, se imputa con la mediana
 
 from __future__ import annotations
 
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
 from scipy.stats import loguniform, randint, uniform
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier
@@ -27,6 +29,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from xgboost import XGBClassifier
 
 from f1pitstop.features.build import E13_FULL_LEAKAGE_SAFE_FEATURES
 from f1pitstop.models.baselines import CATEGORICAL_FEATURES, SEED
@@ -93,6 +96,38 @@ def make_e16_extratrees_e13(n_jobs: int = -1) -> Pipeline:
     )
 
 
+def make_e22_xgboost_e13() -> XGBClassifier:
+    """E22 (Fase 14): XGBClassifier sobre E13, defaults salvo lo minimo
+    para soportar categoricas/NaN nativos (`enable_categorical=True`
+    requiere `tree_method="hist"`). Diversidad controlada frente a E20
+    (HGB): mismo feature set y CV, algoritmo boosting distinto — ver
+    `artifacts/reports/model_selection_framework.md`."""
+    return XGBClassifier(
+        tree_method="hist",
+        enable_categorical=True,
+        random_state=SEED,
+    )
+
+
+def make_e23_catboost_e13() -> CatBoostClassifier:
+    """E23 (Fase 14): CatBoostClassifier sobre E13, defaults salvo
+    `cat_features` (soporte nativo de `Compound`) y `verbose=False` (evitar
+    ruido de log por fold durante CV). Soporta NaN nativamente."""
+    return CatBoostClassifier(
+        cat_features=CATEGORICAL_FEATURES,
+        random_state=SEED,
+        verbose=False,
+    )
+
+
+def make_e24_lightgbm_e13() -> LGBMClassifier:
+    """E24 (Fase 14): LGBMClassifier sobre E13, defaults. Soporte nativo
+    de categoricas (dtype `category`, ya casteado por
+    `prepare_X_for_feature_set`) y de NaN. `verbose=-1` evita el log de
+    warnings por fold durante CV."""
+    return LGBMClassifier(random_state=SEED, verbose=-1)
+
+
 # Comparacion de defaults (paso 1 del procedimiento de Fase 7): mismo
 # feature set E13, mismo CV V1, sin tuning todavia.
 MANUAL_DEFAULTS_REGISTRY = {
@@ -107,6 +142,31 @@ MANUAL_DEFAULTS_REGISTRY = {
     "E16_extratrees_e13_features": {
         "make_model": make_e16_extratrees_e13,
         "model_family": "extra_trees",
+    },
+}
+
+
+# Diversidad controlada (Fase 14, paso 14a): candidatos boosting adicionales
+# sobre EXACTAMENTE el mismo feature set E13 y CV V1 que E20 — la pregunta
+# no es "encontrar el mejor algoritmo posible" (eso es el juego de
+# 186/218 modelos de los ganadores de Kaggle, ver
+# artifacts/reports/model_selection_framework.md), es medir si alguno de
+# estos 3 supera a E20 fuera del margen de ruido de CV lo suficiente para
+# justificar el costo de mantenerlo. Ninguno se tunea individualmente
+# (regla explicita de esta fase: solo defaults, igual que
+# MANUAL_DEFAULTS_REGISTRY antes del tuning de Fase 7).
+DIVERSITY_REGISTRY = {
+    "E22_xgboost_e13_features": {
+        "make_model": make_e22_xgboost_e13,
+        "model_family": "xgboost",
+    },
+    "E23_catboost_e13_features": {
+        "make_model": make_e23_catboost_e13,
+        "model_family": "catboost",
+    },
+    "E24_lightgbm_e13_features": {
+        "make_model": make_e24_lightgbm_e13,
+        "model_family": "lightgbm",
     },
 }
 

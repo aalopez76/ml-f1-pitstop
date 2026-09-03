@@ -8,12 +8,16 @@ import pandas as pd
 from f1pitstop.features.build import E13_FULL_LEAKAGE_SAFE_FEATURES
 from f1pitstop.models.baselines import CATEGORICAL_FEATURES
 from f1pitstop.models.manual_models import (
+    DIVERSITY_REGISTRY,
     MANUAL_DEFAULTS_REGISTRY,
     NUMERIC_FEATURES_E13,
     PARAM_DISTRIBUTIONS,
     make_e14_logreg_e13,
     make_e15_hgb_e13,
     make_e16_extratrees_e13,
+    make_e22_xgboost_e13,
+    make_e23_catboost_e13,
+    make_e24_lightgbm_e13,
     make_tunable_model,
 )
 
@@ -36,6 +40,10 @@ def _toy_X_e13(n: int = 60) -> pd.DataFrame:
     )
     # NaN en la primera vuelta de cada grupo, como produce features/temporal.py.
     df.loc[0, "laptime_delta_prev"] = np.nan
+    # Mismo casteo que prepare_X_for_feature_set() en produccion (features/build.py):
+    # XGBoost/LightGBM (E22/E24) exigen dtype "category" real, no "object", para
+    # soporte nativo de categoricas.
+    df["Compound"] = df["Compound"].astype("category")
     return df[E13_FULL_LEAKAGE_SAFE_FEATURES]
 
 
@@ -98,3 +106,41 @@ def test_make_tunable_model_fits_for_each_family():
         model.fit(X, y)
         proba = model.predict_proba(X)
         assert proba.shape == (len(X), 2)
+
+
+def test_e22_xgboost_fits_and_predicts_proba_with_native_nan_and_categorical():
+    X = _toy_X_e13()
+    y = pd.Series(np.random.default_rng(1).integers(0, 2, len(X)))
+    model = make_e22_xgboost_e13()
+    model.fit(X, y)
+    proba = model.predict_proba(X)
+    assert proba.shape == (len(X), 2)
+
+
+def test_e23_catboost_fits_and_predicts_proba_with_native_nan_and_categorical():
+    X = _toy_X_e13()
+    y = pd.Series(np.random.default_rng(1).integers(0, 2, len(X)))
+    model = make_e23_catboost_e13()
+    model.fit(X, y)
+    proba = model.predict_proba(X)
+    assert proba.shape == (len(X), 2)
+
+
+def test_e24_lightgbm_fits_and_predicts_proba_with_native_nan_and_categorical():
+    X = _toy_X_e13()
+    y = pd.Series(np.random.default_rng(1).integers(0, 2, len(X)))
+    model = make_e24_lightgbm_e13()
+    model.fit(X, y)
+    proba = model.predict_proba(X)
+    assert proba.shape == (len(X), 2)
+
+
+def test_diversity_registry_has_three_expected_runs():
+    assert set(DIVERSITY_REGISTRY.keys()) == {
+        "E22_xgboost_e13_features",
+        "E23_catboost_e13_features",
+        "E24_lightgbm_e13_features",
+    }
+    for spec in DIVERSITY_REGISTRY.values():
+        assert "make_model" in spec
+        assert "model_family" in spec

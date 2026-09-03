@@ -10,9 +10,9 @@
 
 A carefully designed, leakage-aware machine learning pipeline that predicts whether a Formula 1 driver will pit in the next lap during a race.
 
-**Portfolio Question:** *"How much does a carefully designed, leakage-aware ML pipeline gain or lose against AutoML, and what is the cost in complexity, compute and interpretability?"*
+**Portfolio Question:** *"How do you decide when a model is good enough to ship — and document that decision so someone else can audit it?"*
 
-**Answer:** Equal ROC-AUC (0.861 vs 0.861) but **5× faster** (25s vs 121s per fold), fully interpretable, and no overfitting.
+**Answer:** A reproducible model-selection framework (Fase 14), applied end-to-end on this problem. The technical result — tying AutoML (0.861 vs 0.861 ROC-AUC) at **5× less compute** (25s vs 121s per fold), fully interpretable — is the *evidence* for the framework, not the headline. See [`artifacts/reports/model_selection_framework.md`](artifacts/reports/model_selection_framework.md) for the full reasoning, including a direct comparison against the 1st and 2nd place solutions of the real Kaggle competition this dataset is based on (186 and 218 models respectively — neither documents when or why they stopped optimizing).
 
 ---
 
@@ -25,7 +25,8 @@ A carefully designed, leakage-aware machine learning pipeline that predicts whet
 | **Model** | HistGradientBoostingClassifier (tuned) |
 | **Training Speed** | 25s per fold |
 | **AutoGluon Comparison** | 0.861 ROC-AUC, but 5× slower & black-box |
-| **Status** | ✅ All 13 phases completed |
+| **Model Selection Framework** | Fase 14: tested 3 more algorithms + ensemble + 2 features, none justified adopting — E20 remains final |
+| **Status** | ✅ All 14 phases completed |
 
 ---
 
@@ -417,3 +418,53 @@ y el spec no justifica ensemble sin evidencia explícita. No se construye
 ensemble. Si en Fase 13 el holdout confirma que el modelo generaliza (AUC
 ~0.86), la pregunta de portafolio está respondida: el manual iguala
 AutoML sin ensemble.
+
+## Model selection framework (Fase 14)
+
+Reproducible from `scripts/phase14_model_selection_framework.py`. El
+proyecto original (Fases 0-13) respondía "¿empatamos con AutoML?". Esta
+fase reencuadra la pregunta central hacia algo más transferible: "¿cómo
+decides cuándo un modelo es suficientemente bueno, y documentas esa
+decisión?" — motivado por comparar este proyecto contra los writeups del
+1er y 2do lugar de la competencia Kaggle real que inspira este dataset
+(186 y 218 modelos respectivamente, ninguno documenta cuándo paran de
+optimizar). Ver el análisis completo, incluida la comparación Top 1/Top 2,
+en [`artifacts/reports/model_selection_framework.md`](artifacts/reports/model_selection_framework.md).
+
+**Tier 1 (diversidad controlada):** E22 (XGBoost), E23 (CatBoost), E24
+(LightGBM) sobre el mismo feature set E13 y CV V1 que E20, sin tuning
+individual, más E25 (ensemble logit-stack sobre las 4 predicciones OOF).
+
+| run | ROC-AUC (mean±std) | fit (s/fold) | delta vs E20 |
+|---|---|---|---|
+| **E20** (incumbente, tuneado) | **0.8611±0.0250** | 4.39 | — |
+| E22 XGBoost (default) | 0.8590±0.0229 | 2.24 | -0.0021 |
+| E23 CatBoost (default) | 0.8606±0.0216 | **153.58** | -0.0005 |
+| E24 LightGBM (default) | 0.8593±0.0272 | 1.46 | -0.0018 |
+| E25 Ensemble (logit-stack) | 0.8615±0.0246 | — | +0.0004 (ruido) |
+
+**Decisión: se mantiene E20.** Ninguno de los 3 candidatos por defecto lo
+supera; el ensemble gana +0.0004, ~60x menor que el ruido de CV (std
+0.0246) — no justifica mantener 4 modelos (uno de ellos, CatBoost, 35x
+más lento de entrenar) por una ganancia no distinguible del azar.
+
+**Tier 2 (features candidatas):** `laptime_roll_mean_5` y
+`pit_stops_rate_last3`, cada una validada contra el checklist de leakage y
+el test adversarial obligatorio antes del ablation.
+
+| feature | delta vs E13 | veredicto |
+|---|---|---|
+| `laptime_roll_mean_5` | -0.0390 | rechazada (hereda inestabilidad de `laptime_roll_mean_3`, Fase 6) |
+| `pit_stops_rate_last3` | +0.0002 | rechazada (ganancia ~100x menor que el ruido de CV) |
+
+**Decisión: ninguna se adopta.** La segunda tiene delta positivo pero
+indistinguible de ruido — un delta positivo no es, por sí solo, motivo
+para adoptar una feature.
+
+**Tier 3 y 4 (documentados, no implementados):** ensemble gigante, tuning
+obsesivo y drift mitigation ad-hoc se rechazan explícitamente por
+costo/beneficio; re-evaluar el holdout congelado para esta fase se
+rechaza porque violaría `.claude/rules/leakage-and-validation.md` sección
+9 (agregada en esta fase) — el holdout ya se evaluó una única vez en la
+Fase 13 y esa evaluación no se repite. El razonamiento completo de ambos
+rechazos está en el reporte dedicado.

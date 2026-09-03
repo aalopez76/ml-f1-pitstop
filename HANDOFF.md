@@ -8,7 +8,8 @@
 
 ## Estado actual
 
-- **Fase activa:** PROYECTO COMPLETADO (todas las 13 fases cerradas)
+- **Fase activa:** PROYECTO COMPLETADO (todas las 14 fases cerradas —
+  Fase 14 agregada 2026-09-02, ver seccion dedicada mas abajo)
 - **Ultimo criterio de salida cumplido:** Fase 13 (Holdout final y submission)
   — ver `README.md` seccion "AutoGluon challenger (Fase 8)",
   `scripts/phase8_autogluon.py`,
@@ -551,7 +552,65 @@ del spec no se crearon — los criterios de salida de Fase 1 y 2 se
 cubrieron via reportes `.md` + tests + figuras reproducibles.
 `03_leakage_and_validation.ipynb` (Fase 3) sí se creó (exigido por spec).
 
-## Mejoras Opcionales (Basadas en Análisis Kaggle Top 1 y 2)
+## Fase 14 — Model Selection Framework (IMPLEMENTADA, 2026-09-02)
+
+Las "Mejoras Opcionales" documentadas mas abajo (version original de esta
+seccion) se implementaron parcialmente, con resultado real medido en vez
+de estimado — ver `artifacts/reports/model_selection_framework.md` para
+el analisis completo.
+
+**Tier 1 (implementado, `scripts/phase14_model_selection_framework.py`):**
+E22 (XGBoost), E23 (CatBoost), E24 (LightGBM) sobre E13/CV V1, sin tuning
+individual, comparados contra E20 YA TUNEADO (no contra un E20 en
+desventaja):
+
+| run | ROC-AUC (mean±std) | fit (s/fold) | delta vs E20 |
+|---|---|---|---|
+| E20 (incumbente, tuneado) | 0.8611±0.0250 | 4.39 | — |
+| E22 XGBoost (default) | 0.8590±0.0229 | 2.24 | -0.0021 |
+| E23 CatBoost (default) | 0.8606±0.0216 | 153.58 | -0.0005 |
+| E24 LightGBM (default) | 0.8593±0.0272 | 1.46 | -0.0018 |
+| E25 Ensemble (logit-stack, OOF de los 4) | 0.8615±0.0246 | — | +0.0004 |
+
+**Decision: se mantiene E20.** Ninguno supera el margen de ruido de CV
+(std 0.025); el ensemble gana +0.0004 (~60x menor que su propio std) a
+costa de mantener 4 modelos, uno de ellos (CatBoost) 35x mas lento de
+entrenar. No se justifica.
+
+**Tier 2 (implementado, mismo script):** 2 features candidatas
+(`laptime_roll_mean_5`, `pit_stops_rate_last3`) sobre E13, cada una con
+checklist de leakage + test adversarial ya cerrados en
+`tests/test_features.py`:
+
+| feature | delta vs E13 | veredicto |
+|---|---|---|
+| `laptime_roll_mean_5` | -0.0390 | rechazada (hereda inestabilidad de `laptime_roll_mean_3`, Fase 6) |
+| `pit_stops_rate_last3` | +0.0002 | rechazada (ganancia ~100x menor que ruido de CV) |
+
+**Tier 3 (documentado, no implementado):** ensemble gigante, tuning
+obsesivo, drift mitigation ad-hoc — costo/beneficio explicito en el
+reporte dedicado.
+
+**Tier 4 (decision documentada, sin codigo):** se identifico la tentacion
+de verificar estabilidad de permutation importance en el holdout: se
+decidio NO hacerlo porque viola `.claude/rules/leakage-and-validation.md`
+seccion 9 (agregada en esta fase) — el holdout se evalua una unica vez
+(ya ocurrio en Fase 13) y eso aplica tambien a analisis "solo
+diagnostico".
+
+**Candidato final SIN CAMBIOS: `E20_hist_gradient_boosting`** — la
+evidencia real (no la expectativa) confirma que el modelo de Fase 7 sigue
+siendo la mejor opcion disponible una vez contado el costo de cada
+alternativa.
+
+**Cambios de codigo:** `src/f1pitstop/models/manual_models.py` (+E22/E23/
+E24 + `DIVERSITY_REGISTRY`), `src/f1pitstop/models/ensemble.py` (nuevo,
+E25), `src/f1pitstop/features/temporal.py` (+2 features candidatas),
+`scripts/phase14_model_selection_framework.py` (nuevo). Suite de tests:
+92+ (16 nuevos), ruff limpio. Subagente `leakage-auditor` invocado antes
+de cerrar (regla de CLAUDE.md para cambios bajo `features/`).
+
+## Mejoras Opcionales originales (Basadas en Análisis Kaggle Top 1 y 2, superseded por Fase 14)
 
 **RECOMENDACIÓN: NO IMPLEMENTAR** (proyecto ya es excelente para portafolio)
 
@@ -577,14 +636,11 @@ Ganancia marginal << costo de 18+ horas adicionales.
 - Drift mitigation para 2023 — es limitación documentada, no bug
 - Tuning obsesivo (Optuna n_iter=100+) — rendimientos decrecientes
 
-**Análisis Costo-Beneficio:**
-- Mejora conservadora (Tier 1 only): 0.8727 → ~0.8760 (ganancia +0.003)
-- Mejora ambiciosa (Tier 1+2): 0.8727 → ~0.8800 (ganancia +0.007)
-- Mejora brute-force (Tier 1+2+obsesivo tuning): 0.8727 → ~0.885 (ganancia +0.012)
-
-**Veredicto para Portafolio:**
-Actual (0.8727) es más valioso que +0.012 porque demuestra RIGOR, no BRUTE-FORCE.
-Un recruiter preferirá: "Aprendí a validar correctamente" que "Agregué 30 modelos más".
+**Resultado real obtenido en Fase 14 (no estimado):** Tier 1 midio entre
+-0.0021 y +0.0004 (no +0.003–0.008 como se estimaba aqui originalmente) —
+la estimacion previa era demasiado optimista; el resultado real fue
+"ningun candidato nuevo justifica reemplazar a E20", que es en si mismo
+el hallazgo de valor de la fase.
 
 ## Bloqueadores / dudas abiertas
 
@@ -636,3 +692,4 @@ Un recruiter preferirá: "Aprendí a validar correctamente" que "Agregué 30 mod
 | 11 — MLflow final | **cerrada** | 2026-09-01 | E20 registrado como stage=final con tags/metricas obligatorios (CV ROC-AUC 0.8611±0.0251, PR-AUC 0.5531). MLflow es registro central. |
 | 12 — skops | **cerrada** | 2026-09-01 | E20 serializado (1.32 MB), reproducibilidad verificada (predicciones identicas). Trusted types: functools.partial, sklearn.utils.validation.check_array. |
 | 13 — Holdout final y Kaggle | **cerrada** | 2026-09-01 | Holdout (Year==2025): ROC-AUC 0.8727, PR-AUC 0.6985. Gap CV->Holdout: -0.0116 (mejora, no degra). Submission generado (188,165 filas). PROYECTO COMPLETADO. |
+| 14 — Model Selection Framework | **cerrada** | 2026-09-02 | E22/E23/E24 (defaults) y E25 (ensemble) no superan a E20 fuera del margen de ruido de CV; 2 features candidatas descartadas (una por regresion fuerte, otra por ganancia indistinguible de ruido). E20 se mantiene como candidato final. Reencuadra la pregunta de portafolio: no "mejor score", sino "framework reproducible de decision de cuando parar". Ver `artifacts/reports/model_selection_framework.md`. |

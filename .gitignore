@@ -18,6 +18,9 @@ mlflow.db
 AutogluonModels/
 */autogluon_smoke/
 
+# CatBoost training logs (generados automaticamente en cada fit, Fase 14)
+catboost_info/
+
 # Datos (inmutables, no se versionan en git)
 data/raw/
 data/external/

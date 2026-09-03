@@ -23,6 +23,7 @@ from f1pitstop.features.build import (
 from f1pitstop.features.temporal import (
     LAPTIME_WINSORIZE_CAP_SECONDS,
     add_basic_domain_features,
+    add_phase14_candidate_features,
     add_temporal_features,
     add_winsorized_laptime,
 )
@@ -256,6 +257,141 @@ def test_groupby_does_not_mix_two_drivers_interleaved_in_the_same_race():
 
     # D2: idem, solo sus propias vueltas 1-2 (500 winsorizado a 150 ambas)
     assert d2_lap3["laptime_roll_mean_3"] == pytest.approx(LAPTIME_WINSORIZE_CAP_SECONDS)
+
+
+def test_adversarial_roll_mean_5_lap3_does_not_use_future_laps():
+    """Test adversarial obligatorio (leakage-and-validation.md seccion 6)
+    para la candidata Fase 14 `laptime_roll_mean_5`: la vuelta 3 solo tiene
+    2 vueltas previas visibles (1 y 2), asi que su media (con ventana de
+    hasta 5) debe ser identica a la de `laptime_roll_mean_3` — NUNCA debe
+    acercarse a los valores 999 de las vueltas 4/5."""
+    df = _five_lap_toy()
+    out = add_winsorized_laptime(df)
+    out = add_basic_domain_features(out)
+    out = add_phase14_candidate_features(out)
+
+    lap3_row = out[out["LapNumber"] == 3].iloc[0]
+    expected_mean = np.mean([90.0, 92.0])
+    assert lap3_row["laptime_roll_mean_5"] == pytest.approx(expected_mean)
+    assert lap3_row["laptime_roll_mean_5"] < 200
+
+
+def test_roll_mean_5_lap5_uses_up_to_four_prior_laps_only():
+    """La vuelta 5 (indice 4) tiene 4 vueltas previas visibles (1-4); con
+    ventana 5 debe promediarlas TODAS (90, 92, 88, 150-winsorizada), nunca
+    su propio LapTime."""
+    df = _five_lap_toy()
+    out = add_winsorized_laptime(df)
+    out = add_basic_domain_features(out)
+    out = add_phase14_candidate_features(out)
+
+    lap5_row = out[out["LapNumber"] == 5].iloc[0]
+    expected_mean = np.mean([90.0, 92.0, 88.0, LAPTIME_WINSORIZE_CAP_SECONDS])
+    assert lap5_row["laptime_roll_mean_5"] == pytest.approx(expected_mean)
+
+
+def test_pit_stops_rate_last3_first_lap_is_nan():
+    df = _five_lap_toy()
+    out = add_winsorized_laptime(df)
+    out = add_basic_domain_features(out)
+    out = add_phase14_candidate_features(out)
+    lap1_row = out[out["LapNumber"] == 1].iloc[0]
+    assert pd.isna(lap1_row["pit_stops_rate_last3"])
+
+
+def test_pit_stops_rate_last3_does_not_count_current_row_pitstop():
+    """PitStop = [0,0,0,1,0]. La vuelta 4 (que SI tiene PitStop=1) debe
+    calcular su tasa con las vueltas 1-3 (todas 0) -> 0.0, NUNCA contar su
+    propio PitStop=1 (si lo hiciera, el resultado seria 1/3, no 0)."""
+    df = _five_lap_toy()
+    out = add_winsorized_laptime(df)
+    out = add_basic_domain_features(out)
+    out = add_phase14_candidate_features(out)
+    lap4_row = out[out["LapNumber"] == 4].iloc[0]
+    assert lap4_row["pit_stops_rate_last3"] == pytest.approx(0.0)
+
+
+def test_pit_stops_rate_last3_picks_up_pit_from_prior_window():
+    """La vuelta 5 debe ver el pit de la vuelta 4 dentro de su ventana de
+    3 vueltas previas (2,3,4 -> PitStop [0,0,1]) -> tasa 1/3."""
+    df = _five_lap_toy()
+    out = add_winsorized_laptime(df)
+    out = add_basic_domain_features(out)
+    out = add_phase14_candidate_features(out)
+    lap5_row = out[out["LapNumber"] == 5].iloc[0]
+    assert lap5_row["pit_stops_rate_last3"] == pytest.approx(1 / 3)
+
+
+def test_add_phase14_candidate_features_preserves_row_count_and_index():
+    df = _five_lap_toy()
+    out = add_winsorized_laptime(df)
+    out = add_basic_domain_features(out)
+    out = add_phase14_candidate_features(out)
+    assert len(out) == len(df)
+    assert list(out.index) == list(df.index)
+
+
+def test_add_phase14_candidate_features_raises_without_prerequisites():
+    df = _five_lap_toy()
+    with pytest.raises(ValueError):
+        add_phase14_candidate_features(df)
+    out = add_winsorized_laptime(df)
+    with pytest.raises(ValueError):
+        add_phase14_candidate_features(out)
+
+
+def test_phase14_groupby_does_not_mix_two_drivers_roll_mean_5():
+    df = _two_driver_interleaved_toy()
+    out = add_winsorized_laptime(df)
+    out = add_basic_domain_features(out)
+    out = add_phase14_candidate_features(out)
+
+    d1_lap3 = out[(out["Driver"] == "D1") & (out["LapNumber"] == 3)].iloc[0]
+    d2_lap3 = out[(out["Driver"] == "D2") & (out["LapNumber"] == 3)].iloc[0]
+
+    assert d1_lap3["laptime_roll_mean_5"] == pytest.approx(np.mean([50.0, 51.0]))
+    assert d2_lap3["laptime_roll_mean_5"] == pytest.approx(LAPTIME_WINSORIZE_CAP_SECONDS)
+
+
+def _two_driver_interleaved_pitstop_toy() -> pd.DataFrame:
+    """Variante de `_two_driver_interleaved_toy` con `PitStop` DISTINTO
+    entre D1 y D2 (la version original tiene PitStop=0 para ambos, lo que
+    no puede exponer una mezcla accidental de historiales via
+    `pit_stops_rate_last3`). D1 pitea en la vuelta 2; D2 nunca pitea — si
+    el groupby mezclara los dos autos, la tasa de D2 en la vuelta 3
+    dejaria de ser 0."""
+    return pd.DataFrame(
+        {
+            "id": [0, 1, 2, 3, 4, 5],
+            "Driver": ["D1", "D2", "D1", "D2", "D1", "D2"],
+            "Race": ["Test GP"] * 6,
+            "Year": [2024] * 6,
+            "LapNumber": [1, 1, 2, 2, 3, 3],
+            "LapTime (s)": [50.0, 60.0, 51.0, 61.0, 52.0, 62.0],
+            "TyreLife": [1.0, 1.0, 2.0, 2.0, 1.0, 3.0],
+            "Stint": [1, 1, 1, 1, 2, 1],
+            "Position": [1, 2, 1, 2, 1, 2],
+            "PitStop": [0, 0, 1, 0, 0, 0],
+            "Compound": ["SOFT"] * 6,
+        }
+    )
+
+
+def test_phase14_groupby_does_not_mix_two_drivers_pit_stops_rate():
+    df = _two_driver_interleaved_pitstop_toy()
+    out = add_winsorized_laptime(df)
+    out = add_basic_domain_features(out)
+    out = add_phase14_candidate_features(out)
+
+    d1_lap3 = out[(out["Driver"] == "D1") & (out["LapNumber"] == 3)].iloc[0]
+    d2_lap3 = out[(out["Driver"] == "D2") & (out["LapNumber"] == 3)].iloc[0]
+
+    # D1 piteo en la vuelta 2 -> su tasa en la vuelta 3 (ventana: vueltas
+    # 1-2, PitStop=[0,1]) debe ser 0.5.
+    assert d1_lap3["pit_stops_rate_last3"] == pytest.approx(0.5)
+    # D2 NUNCA piteo -> su tasa en la vuelta 3 debe seguir en 0.0, NUNCA
+    # "contagiarse" del pit de D1 solo porque sus filas estan intercaladas.
+    assert d2_lap3["pit_stops_rate_last3"] == pytest.approx(0.0)
 
 
 def test_groupby_does_not_mix_two_drivers_recomputed_stint():

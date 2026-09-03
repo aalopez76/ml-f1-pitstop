@@ -30,7 +30,15 @@ E04_skrub_preprocessing  A01_autogluon_engineered
 E10_raw_features         F00_final_sklearn
 E11_basic_domain_features F01_final_autogluon
 E12_temporal_features
+E22_xgboost_e13_features   E24_lightgbm_e13_features
+E23_catboost_e13_features  E25_ensemble_logit_stack
 ```
+
+`E22`-`E25` (Fase 14, "Model Selection Framework"): candidatos de
+diversidad controlada sobre el mismo feature set E13 y CV V1 — ver
+`artifacts/reports/model_selection_framework.md`. Se comparan y deciden
+enteramente sobre CV en `dev`, nunca sobre el holdout congelado (ver
+`.claude/rules/leakage-and-validation.md` §9).
 
 ## Tags obligatorios por run
 
