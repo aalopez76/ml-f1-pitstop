@@ -445,6 +445,12 @@ Otros hallazgos (Fase 1 + Fase 2, no criticos pero a resolver en Fase 3):
 
 **PROYECTO 100% COMPLETADO Y LISTO PARA PORTAFOLIO** — Todas las 13 fases cerradas, código en GitHub, artículo en Medium, página personal actualizada.
 
+**Commit final (2026-09-02, sesión última):**
+- Agregados artefactos finales de análisis (Fases 9-10): error_analysis/ (6 CSVs de segmentación) y skore/ (permutation importance)
+- F1_Pit_Stop_ML.md (narrativa para portafolio personal) commiteado
+- Eliminado e20_oof_predictions.csv (35 MB, generado, no necesario versionar)
+- Pusheo a GitHub completado: `33c05cc`
+
 **Resultados finales:**
 - **Candidato ganador:** E20_hist_gradient_boosting (manual, interpretable)
 - **CV ROC-AUC:** 0.8611±0.0251 (Fase 7, estrategia V1)
