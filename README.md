@@ -10,23 +10,27 @@
 
 A carefully designed, leakage-aware machine learning pipeline that predicts whether a Formula 1 driver will pit in the next lap during a race.
 
-**Portfolio Question:** *"How do you decide when a model is good enough to ship — and document that decision so someone else can audit it?"*
+**Portfolio Question:** *"What's the difference between winning a Kaggle leaderboard and building a model that works?"*
 
-**Answer:** A reproducible model-selection framework (Fase 14), applied end-to-end on this problem. The technical result — tying AutoML (0.861 vs 0.861 ROC-AUC) at **5× less compute** (25s vs 121s per fold), fully interpretable — is the *evidence* for the framework, not the headline. See [`artifacts/reports/model_selection_framework.md`](artifacts/reports/model_selection_framework.md) for the full reasoning, including a direct comparison against the 1st and 2nd place solutions of the real Kaggle competition this dataset is based on (186 and 218 models respectively — neither documents when or why they stopped optimizing).
+**Quick Answer:** This project achieves **0.8727 ROC-AUC (holdout)** while staying rigorous — Kaggle winners scored 0.955 by using data leakage, 250+ models, and brute-force optimization that would be disqualifying in production. 
+
+**Deep Dive:** Read [`artifacts/reports/Kaggle_Leaderboard_Analysis.md`](artifacts/reports/Kaggle_Leaderboard_Analysis.md) for a critical analysis of what Kaggle's #1, #2, #11, and #17 place solutions actually did (spoiler: #1 beat #2 by 0.00001, a coin flip). This project chose instead to build an audited, reproducible framework for when to stop optimizing — and to document why.
 
 ---
 
 ## 🎯 Quick Summary
 
-| Metric | Value |
-|---|---|
-| **CV ROC-AUC** | 0.8611 ± 0.0251 (V1 strategy, 5-fold) |
-| **Holdout ROC-AUC** | 0.8727 (Year 2025, unseen) |
-| **Model** | HistGradientBoostingClassifier (tuned) |
-| **Training Speed** | 25s per fold |
-| **AutoGluon Comparison** | 0.861 ROC-AUC, but 5× slower & black-box |
-| **Model Selection Framework** | Fase 14: tested 3 more algorithms + ensemble + 2 features, none justified adopting — E20 remains final |
-| **Status** | ✅ All 14 phases completed |
+| Metric | Value | Why It Matters |
+|---|---|---|
+| **CV ROC-AUC** | 0.8611 ± 0.0251 (V1 strategy, 5-fold) | Reproducible, group-aware validation |
+| **Holdout ROC-AUC** | 0.8727 (Year 2025, unseen) | Better than CV (−0.0116 gap) = no overfitting ✅ |
+| **Kaggle Leaderboard** | ~0.955 (Rank 1–2) | Achievable by adding leakage features + 250 models |
+| **Model** | HistGradientBoostingClassifier (tuned) | Single, interpretable, 8-feature model |
+| **Training Speed** | 25s per fold (8 cores, CPU) | vs 121s for AutoGluon, vs 100+ GPU-days for Rank 17 |
+| **AutoGluon Comparison** | 0.861 ROC-AUC, but 5× slower & black-box | Proves: **features > algorithm** (Fase 8 conclusion) |
+| **Model Selection** | Tested 3 algorithms + ensemble + 2 features (Fase 14) | All alternatives: <±0.001 gain (noise level) |
+| **Leakage Audit** | ✅ 5Q checklist, subagent review, code-level validation | Kaggle winners: no documented audit |
+| **Status** | ✅ All 14 phases completed, reproducible, auditable | Defended for production use |
 
 ---
 

@@ -6,6 +6,16 @@
 > Optimizar para que quien lea esto (humano o Claude, sin memoria de la
 > sesion anterior) pueda continuar sin tener que releer todo el spec.
 
+## ⚠️ CRITICAL UPDATE (2026-09-10)
+
+**Narrativa del proyecto reencuadrada.** Ver `artifacts/reports/Kaggle_Leaderboard_Analysis.md` — análisis crítico de qué hacen los ganadores de Kaggle vs lo que este proyecto hizo deliberadamente:
+
+- Kaggle #1–2: 0.955 ROC-AUC (leakage + 186–218 OOFs)
+- Este proyecto: 0.8727 ROC-AUC (rigor + 1 modelo tuneado)
+- Brecha: 0.0823 AUC explicada por: leakage (−0.03), brute-force (−0.03), feature count (−0.02), noise (−0.0013)
+
+**Implicación para portafolio:** El proyecto no se presenta como "score alto" sino como "framework reproducible de decisiones de ML vs leaderboard gaming". README y análisis de Kaggle actualizados para enfatizar esto.
+
 ## Estado actual
 
 - **Fase activa:** PROYECTO COMPLETADO (todas las 14 fases cerradas —
