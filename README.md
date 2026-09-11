@@ -6,41 +6,34 @@
 ![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
-## 📊 Portfolio ML Project: Predicting F1 Pit Stops
+## Portfolio ML Project: Predicting F1 Pit Stops
 
 A carefully designed, leakage-aware machine learning pipeline that predicts whether a Formula 1 driver will pit in the next lap during a race.
 
-**Portfolio Question:** *"What are the real trade-offs between manual + rigorous vs AutoML vs brute-force ensemble approaches? When should you choose each?"*
+**Portfolio question:** *given the constraints of this project (CPU-only compute, reproducibility, interpretability, maintainability), which class of solution is appropriate, and what evidence would justify replacing it?*
 
-**Answer:** This project maps all three architectural approaches honestly — with data, not rhetoric.
+Two documents carry the reasoning:
 
-**Pieza Central:** [`artifacts/reports/Architecture_Decision_Framework.md`](artifacts/reports/Architecture_Decision_Framework.md)  
-A Staff/Senior Engineering decision record that compares:
-- **Manual + Rigorous** (this project): 0.8727 AUC, CPU-only, interpretable, 25s/fold, reproducible ✅
-- **AutoML** (AutoGluon): 0.861 AUC, CPU or GPU, black-box, 121s/fold, semi-reproducible ⚠️
-- **Brute-Force Ensemble** (Kaggle Top 1-2): 0.955 AUC, GPU required, 100+ GPU-hours, 230k LOC, leakage ❌
+- [`modeling_strategy_decision_record.md`](artifacts/reports/modeling_strategy_decision_record.md) — why this solution class was chosen over AutoML and higher-capacity alternatives, including what the choice costs and where it can fail.
+- [`model_selection_framework.md`](artifacts/reports/model_selection_framework.md) — the incumbent-challenge procedure: how challengers are screened, what evidence would justify a replacement, and why none of the Phase 14 candidates qualified.
 
-**Not "who wins," but "who's right for what context."** Each is optimal given different constraints.
-
-**Bonus reads:** 
-- [`Kaggle_Leaderboard_Analysis.md`](artifacts/reports/Kaggle_Leaderboard_Analysis.md) — What Rank 1-2-11-17 actually did (with their explicit trade-offs)
-- [`model_selection_framework.md`](artifacts/reports/model_selection_framework.md) — Fase 14: Why we tested alternatives and why E20 stays final
+The project reports three quantities that are kept strictly separate and are never subtracted from one another, because they come from different evaluation protocols: **group-aware cross-validation**, a **reserved internal holdout** evaluated once, and a **Kaggle late-submission score** used only as an external reference point.
 
 ---
 
-## 🎯 Quick Summary
+## Quick Summary
 
-| Metric | Value | Why It Matters |
+| Metric | Value | Notes |
 |---|---|---|
-| **CV ROC-AUC** | 0.8611 ± 0.0251 (V1 strategy, 5-fold) | Reproducible, group-aware validation |
-| **Holdout ROC-AUC** | 0.8727 (Year 2025, unseen) | Better than CV (−0.0116 gap) = no overfitting ✅ |
-| **Kaggle Leaderboard** | ~0.955 (Rank 1–2) | Achievable by adding leakage features + 250 models |
-| **Model** | HistGradientBoostingClassifier (tuned) | Single, interpretable, 8-feature model |
-| **Training Speed** | 25s per fold (8 cores, CPU) | vs 121s for AutoGluon, vs 100+ GPU-days for Rank 17 |
-| **AutoGluon Comparison** | 0.861 ROC-AUC, but 5× slower & black-box | Proves: **features > algorithm** (Fase 8 conclusion) |
-| **Model Selection** | Tested 3 algorithms + ensemble + 2 features (Fase 14) | All alternatives: <±0.001 gain (noise level) |
-| **Leakage Audit** | ✅ 5Q checklist, subagent review, code-level validation | Kaggle winners: no documented audit |
-| **Status** | ✅ All 14 phases completed, reproducible, auditable | Defended for production use |
+| **CV ROC-AUC** | 0.8611 +/- 0.0251 | V1 group-aware, 5 folds, seed fijo |
+| **Holdout ROC-AUC** | 0.8727 | `Year == 2025`, evaluado una unica vez (Fase 13). Cae dentro de la variabilidad observada en CV: sin evidencia de brecha material de generalizacion |
+| **Model** | `HistGradientBoostingClassifier` (tuneado) | Un solo modelo, 10 features |
+| **Training** | ~25 s/fold en CPU (8 cores) | AutoGluon con el mismo feature set: ~121 s/fold |
+| **Inference** | 3.59 ms / 1k filas | Medido en el mismo hardware que el entrenamiento |
+| **AutoML comparison** | AutoGluon A01: 0.861 | Empate dentro del ruido con el manual. Sin feature engineering (A00): 0.813 — el feature engineering domina sobre la eleccion de algoritmo |
+| **Phase 14 challengers** | XGBoost, CatBoost, LightGBM, logit-stack | Ninguno aporta evidencia suficiente para reemplazar al incumbente; ver `model_selection_framework.md` |
+| **Leakage audit** | Checklist de 5 preguntas por feature + revision independiente | `.claude/rules/leakage-and-validation.md` |
+| **Deployment complexity** | Baja respecto a las alternativas evaluadas | Un artefacto, sin GPU, superficie de dependencias reducida. El despliegue en si esta fuera del alcance del proyecto |
 
 ---
 
@@ -433,52 +426,69 @@ ensemble. Si en Fase 13 el holdout confirma que el modelo generaliza (AUC
 ~0.86), la pregunta de portafolio está respondida: el manual iguala
 AutoML sin ensemble.
 
-## Model selection framework (Fase 14)
+## Incumbent challenge evaluation (Fase 14)
 
-Reproducible from `scripts/phase14_model_selection_framework.py`. El
-proyecto original (Fases 0-13) respondía "¿empatamos con AutoML?". Esta
-fase reencuadra la pregunta central hacia algo más transferible: "¿cómo
-decides cuándo un modelo es suficientemente bueno, y documentas esa
-decisión?" — motivado por comparar este proyecto contra los writeups del
-1er y 2do lugar de la competencia Kaggle real que inspira este dataset
-(186 y 218 modelos respectivamente, ninguno documenta cuándo paran de
-optimizar). Ver el análisis completo, incluida la comparación Top 1/Top 2,
-en [`artifacts/reports/model_selection_framework.md`](artifacts/reports/model_selection_framework.md).
+Reproducible from `scripts/phase14_model_selection_framework.py`. Full
+reasoning in
+[`artifacts/reports/model_selection_framework.md`](artifacts/reports/model_selection_framework.md).
 
-**Tier 1 (diversidad controlada):** E22 (XGBoost), E23 (CatBoost), E24
-(LightGBM) sobre el mismo feature set E13 y CV V1 que E20, sin tuning
-individual, más E25 (ensemble logit-stack sobre las 4 predicciones OOF).
+Las Fases 0-13 respondian "¿empatamos con AutoML?". Esta fase plantea una
+pregunta distinta y mas transferible: **¿existe evidencia suficiente para
+reemplazar al modelo en uso?** El incumbente es E20, tuneado en Fase 7.
 
-| run | ROC-AUC (mean±std) | fit (s/fold) | delta vs E20 |
-|---|---|---|---|
-| **E20** (incumbente, tuneado) | **0.8611±0.0250** | 4.39 | — |
-| E22 XGBoost (default) | 0.8590±0.0229 | 2.24 | -0.0021 |
-| E23 CatBoost (default) | 0.8606±0.0216 | **153.58** | -0.0005 |
-| E24 LightGBM (default) | 0.8593±0.0272 | 1.46 | -0.0018 |
-| E25 Ensemble (logit-stack) | 0.8615±0.0246 | — | +0.0004 (ruido) |
+**Tier 1 — challenger screening.** E22 (XGBoost), E23 (CatBoost) y E24
+(LightGBM) con parametros por defecto sobre el mismo feature set E13 y la
+misma CV V1 que E20, mas E25 (logit-stack sobre las OOF de los cuatro).
 
-**Decisión: se mantiene E20.** Ninguno de los 3 candidatos por defecto lo
-supera; el ensemble gana +0.0004, ~60x menor que el ruido de CV (std
-0.0246) — no justifica mantener 4 modelos (uno de ellos, CatBoost, 35x
-más lento de entrenar) por una ganancia no distinguible del azar.
+La comparacion se hace con **deltas pareados por fold**, no restando medias:
+todos los runs comparten los mismos folds, asi que
+`d_i = AUC(challenger, fold_i) - AUC(E20, fold_i)` es una comparacion valida,
+mientras que contrastar una diferencia de medias contra la desviacion tipica
+entre folds no lo es (esa std no es la incertidumbre de la diferencia). Los
+scores por fold estan en `artifacts/tables/phase14_fold_level_scores.csv` y
+los deltas en `artifacts/tables/phase14_paired_deltas.csv`.
 
-**Tier 2 (features candidatas):** `laptime_roll_mean_5` y
-`pit_stops_rate_last3`, cada una validada contra el checklist de leakage y
-el test adversarial obligatorio antes del ablation.
+> E20 fue seleccionado y tuneado usando esta misma estructura de CV. Estas
+> comparaciones evaluan challengers baratos frente a un incumbente ya
+> optimizado; no son un benchmark imparcial entre familias de algoritmos.
+
+**E25 no es elegible para promocion.** Su evaluacion esta contaminada entre
+capas: las predicciones OOF y la CV del stacker comparten los mismos folds, de
+modo que el meta-modelo se entrena con meta-features producidas por modelos
+base que vieron su propio fold de validacion. Su delta observado no puede
+interpretarse como estimacion de rendimiento incremental. El CSV lo marca como
+`exploratory_contaminated` / `promotion_evaluation_valid = false`, para que la
+advertencia viaje con el dato.
+
+**Tier 2 — features candidatas.** Ambas pasaron el checklist de leakage y el
+test adversarial antes del ablation.
 
 | feature | delta vs E13 | veredicto |
 |---|---|---|
-| `laptime_roll_mean_5` | -0.0390 | rechazada (hereda inestabilidad de `laptime_roll_mean_3`, Fase 6) |
-| `pit_stops_rate_last3` | +0.0002 | rechazada (ganancia ~100x menor que el ruido de CV) |
+| `laptime_roll_mean_5` | -0.0390 | rechazada (degradacion clara) |
+| `pit_stops_rate_last3` | +0.0002 | rechazada (no demuestra mejora practica reproducible) |
 
-**Decisión: ninguna se adopta.** La segunda tiene delta positivo pero
-indistinguible de ruido — un delta positivo no es, por sí solo, motivo
-para adoptar una feature.
+Sobre la primera, la conclusion sostenible es acotada: las dos ventanas
+evaluadas (3 y 5 vueltas) degradaron la generalizacion group-aware, lo que no
+da evidencia para seguir invirtiendo en esa familia. No se afirma que ninguna
+ventana funcione.
 
-**Tier 3 y 4 (documentados, no implementados):** ensemble gigante, tuning
-obsesivo y drift mitigation ad-hoc se rechazan explícitamente por
-costo/beneficio; re-evaluar el holdout congelado para esta fase se
-rechaza porque violaría `.claude/rules/leakage-and-validation.md` sección
-9 (agregada en esta fase) — el holdout ya se evaluó una única vez en la
-Fase 13 y esa evaluación no se repite. El razonamiento completo de ambos
-rechazos está en el reporte dedicado.
+**Tier 3 — no perseguido.** Ensemble grande y tuning intensivo de los
+challengers se descartan por presupuesto experimental, sin estimar la ganancia
+que habrian producido (no se midio). La anomalia de 2023 se documenta como
+failure mode operativo, no se "arregla".
+
+**Tier 4 — el holdout no se reabre.** Calcular permutation importance sobre el
+holdout congelado consumiria informacion del conjunto reservado: no seria
+leakage de entrenamiento por si mismo, pero introduciria post-selection
+feedback y violaria la politica de un unico uso fijada en Fase 3.
+
+**La regla que faltaba.** Fase 14 decidio si cada delta era suficiente
+*despues* de observarlo. No se corrige inventando retroactivamente un umbral:
+la decision se declara retrospectiva, y una **Challenger Acceptance Policy**
+(G0-G6, con el umbral minimo y las tolerancias pre-registradas en
+`configs/experiments/<id>.yaml` y commiteadas antes de ejecutar) entra en
+vigor de forma prospectiva desde Fase 15.
+
+**Resultado: E20 se mantiene.** Ningun challenger aporto evidencia valida y
+suficiente para desplazarlo.

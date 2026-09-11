@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from f1pitstop.evaluation.cv import run_group_cv
+from f1pitstop.evaluation.cv import CVResult, run_group_cv
 from f1pitstop.models.baselines import make_e00_dummy, make_e01_logreg
 
 
@@ -127,3 +127,58 @@ def test_cv_result_to_metrics_dict_has_required_keys():
         "n_features",
     }
     assert expected_keys <= set(metrics.keys())
+
+
+# --- Persistencia por fold (auditoria 2026-09-10) ---
+#
+# `to_metrics_dict()` colapsa los folds a mean/std, lo que impide comparaciones
+# pareadas entre modelos. `to_fold_rows()` conserva el detalle.
+
+
+def _toy_cv_result(n_folds: int = 5) -> CVResult:
+    return CVResult(
+        run_name="E99_toy",
+        roc_auc_scores=[0.80 + 0.01 * i for i in range(n_folds)],
+        pr_auc_scores=[0.50 + 0.01 * i for i in range(n_folds)],
+        fit_seconds=[1.0] * n_folds,
+        predict_ms_per_1k_rows=[2.0] * n_folds,
+        n_features=10,
+        n_folds=n_folds,
+    )
+
+
+def test_to_fold_rows_emits_one_row_per_fold():
+    result = _toy_cv_result(n_folds=5)
+    rows = result.to_fold_rows()
+
+    assert len(rows) == result.n_folds
+    assert [r["fold_idx"] for r in rows] == [0, 1, 2, 3, 4]
+    assert all(r["run_name"] == "E99_toy" for r in rows)
+
+
+def test_to_fold_rows_is_consistent_with_to_metrics_dict():
+    """Las medias reconstruidas desde las filas por fold deben coincidir con
+    las que ya publica `to_metrics_dict()` — si divergieran, el CSV por fold
+    y el CSV agregado contarian historias distintas."""
+    result = _toy_cv_result()
+    rows = result.to_fold_rows()
+    metrics = result.to_metrics_dict()
+
+    assert np.mean([r["roc_auc"] for r in rows]) == pytest.approx(metrics["cv_roc_auc_mean"])
+    assert np.mean([r["pr_auc"] for r in rows]) == pytest.approx(metrics["cv_pr_auc_mean"])
+
+
+def test_paired_delta_is_computable_from_fold_rows():
+    """El delta pareado exige el detalle por fold: restar dos medias no
+    permite conocer la dispersion de la diferencia."""
+    a = _toy_cv_result()
+    b = _toy_cv_result()
+    b.run_name = "E98_toy"
+    b.roc_auc_scores = [s + 0.002 for s in b.roc_auc_scores]
+
+    deltas = [
+        rb["roc_auc"] - ra["roc_auc"]
+        for ra, rb in zip(a.to_fold_rows(), b.to_fold_rows())
+    ]
+    assert len(deltas) == a.n_folds
+    assert np.mean(deltas) == pytest.approx(0.002)

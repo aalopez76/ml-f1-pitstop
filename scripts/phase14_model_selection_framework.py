@@ -67,6 +67,20 @@ VALIDATION_NAME = "V1_group_kfold_race_year_5fold"
 FEATURE_SET_NAME = "E13_full_leakage_safe_features"
 TABLES_DIR = Path("artifacts/tables")
 
+# Estado metodologico de cada run, persistido en el CSV por-fold para que la
+# advertencia viaje CON el dato y no dependa de recordar un documento.
+# `promotion_evaluation_valid` significa "su evaluacion es metodologicamente
+# valida para considerar una promocion", NO "cumplio los criterios para ser
+# promovido". E25 esta contaminado entre capas (ver `step_14a_ensemble`).
+EVALUATION_STATUS = {
+    "E20_hist_gradient_boosting": ("incumbent_reference", "not_applicable"),
+    "E22_xgboost_e13_features": ("valid_challenger", "true"),
+    "E23_catboost_e13_features": ("valid_challenger", "true"),
+    "E24_lightgbm_e13_features": ("valid_challenger", "true"),
+    "E25_ensemble_logit_stack": ("exploratory_contaminated", "false"),
+}
+INCUMBENT = "E20_hist_gradient_boosting"
+
 # Best params de E20 (Fase 7, README "Manual models (Fase 7)"). Se compara
 # contra la version YA TUNEADA, no contra el default sin tuning — ver
 # docstring del modulo.
@@ -105,8 +119,13 @@ def load_dev_e13() -> tuple[pd.DataFrame, pd.Series, pd.Series, pd.DataFrame]:
 def compute_oof_predictions(make_model, X: pd.DataFrame, y: pd.Series, groups: pd.Series, seed: int = SEED) -> np.ndarray:
     """Predicciones out-of-fold sobre el MISMO split V1 (mismo seed) que
     usa `run_group_cv` — cada fila se predice con un modelo que nunca la
-    vio en entrenamiento. Necesario para armar la matriz de features del
-    stacker E25 sin leakage entre modelos base y meta-modelo."""
+    vio en entrenamiento.
+
+    ADVERTENCIA (auditoria 2026-09-10): reusar el MISMO split para generar
+    las OOF y para evaluar el stacker es precisamente lo que contamina la
+    evaluacion de E25 — ver docstring de `step_14a_ensemble()`. Esta
+    funcion es correcta para PRODUCIR las OOF; lo que no es valido es
+    evaluar el meta-modelo sobre esos mismos folds."""
     oof = np.full(len(X), np.nan)
     for train_idx, val_idx in v1_group_stratified_kfold(y, groups, n_splits=5, seed=seed):
         model = make_model()
@@ -116,12 +135,13 @@ def compute_oof_predictions(make_model, X: pd.DataFrame, y: pd.Series, groups: p
     return oof
 
 
-def step_14a_diversity(X, y, groups) -> pd.DataFrame:
+def step_14a_diversity(X, y, groups) -> tuple[pd.DataFrame, list[dict]]:
     """Tier 1: compara E22/E23/E24 (defaults) contra E20 (tuneado, Fase 7)
     sobre CV V1. Ninguno de los 3 nuevos se tunea individualmente — regla
     explicita de esta fase (ver docstring del modulo)."""
     print("\n### 14a: Diversidad controlada (E22-E24) vs E20 tuneado ###")
     rows = []
+    fold_rows: list[dict] = []
 
     candidates = {"E20_hist_gradient_boosting": {"make_model": make_e20_tuned, "model_family": "hist_gradient_boosting"}}
     candidates.update(DIVERSITY_REGISTRY)
@@ -146,19 +166,33 @@ def step_14a_diversity(X, y, groups) -> pd.DataFrame:
             f"fit {metrics['fit_seconds']:.2f}s | mlflow run_id={run_id}"
         )
         rows.append({"run_name": run_name, "model_family": spec["model_family"], **metrics, "mlflow_run_id": run_id})
+        fold_rows.extend(result.to_fold_rows())
 
     df = pd.DataFrame(rows)
     out_path = TABLES_DIR / "phase14_diversity_comparison.csv"
     df.to_csv(out_path, index=False)
     print(f"Guardado en {out_path}")
-    return df
+    return df, fold_rows
 
 
-def step_14a_ensemble(X, y, groups) -> dict:
-    """E25: logit-stack sobre predicciones OOF de E20/E22/E23/E24. La CV
-    del stacker reusa `run_group_cv` sobre la matriz OOF como si fuera un
-    feature set mas — el mismo seed reproduce el mismo split V1 usado para
-    generar las OOF, asi que no hay leakage entre el nivel base y el meta."""
+def step_14a_ensemble(X, y, groups) -> tuple[dict, list[dict]]:
+    """E25: logit-stack sobre predicciones OOF de E20/E22/E23/E24.
+
+    ADVERTENCIA METODOLOGICA (auditoria 2026-09-10): la version previa de
+    este docstring afirmaba que reusar el mismo split V1 evitaba el leakage
+    entre nivel base y meta. El razonamiento estaba invertido.
+
+    Las OOF y la CV del stacker comparten los mismos folds V1. Cuando F1 es
+    el fold de validacion del stacker, este se entrena con filas de F2..F5
+    cuyas meta-features fueron producidas por modelos base entrenados en
+    F1+F3+F4+F5 — es decir, modelos que SI vieron F1. La evaluacion NO es
+    nested/cross-fitted y su metrica presenta un sesgo de magnitud y
+    direccion no cuantificadas.
+
+    Consecuencia: la metrica de E25 no es evidencia valida de rendimiento
+    incremental y E25 no es elegible para promocion. No se construye un
+    pipeline de nested stacking (fuera de alcance, ver
+    `artifacts/reports/model_selection_framework.md`)."""
     print("\n### 14a: E25 ensemble (logit-stack sobre OOF de E20/E22/E23/E24) ###")
 
     base_models = {"E20_hist_gradient_boosting": make_e20_tuned}
@@ -188,7 +222,8 @@ def step_14a_ensemble(X, y, groups) -> dict:
         f"E25_ensemble_logit_stack: ROC-AUC {metrics['cv_roc_auc_mean']:.4f} ± {metrics['cv_roc_auc_std']:.4f} | "
         f"mlflow run_id={run_id}"
     )
-    return {"run_name": "E25_ensemble_logit_stack", "model_family": "logistic_regression_stack", **metrics, "mlflow_run_id": run_id}
+    row = {"run_name": "E25_ensemble_logit_stack", "model_family": "logistic_regression_stack", **metrics, "mlflow_run_id": run_id}
+    return row, result.to_fold_rows()
 
 
 def step_14b_feature_ablation(engineered: pd.DataFrame, y: pd.Series, groups: pd.Series) -> pd.DataFrame:
@@ -245,6 +280,76 @@ def step_14b_feature_ablation(engineered: pd.DataFrame, y: pd.Series, groups: pd
     return df
 
 
+def write_fold_level_scores(fold_rows: list[dict]) -> pd.DataFrame:
+    """Persiste ROC-AUC/PR-AUC por fold, con el estado metodologico de cada run.
+
+    `to_metrics_dict()` solo conserva mean/std, lo que impide comparaciones
+    pareadas: restar dos medias NO equivale a promediar la diferencia por fold,
+    y la std entre folds no es la incertidumbre de esa diferencia.
+    """
+    df = pd.DataFrame(fold_rows)
+    df["evaluation_status"] = df["run_name"].map(lambda r: EVALUATION_STATUS[r][0])
+    df["promotion_evaluation_valid"] = df["run_name"].map(lambda r: EVALUATION_STATUS[r][1])
+    out_path = TABLES_DIR / "phase14_fold_level_scores.csv"
+    df.to_csv(out_path, index=False)
+    print()
+    print(f"Scores por fold guardados en {out_path}")
+    return df
+
+
+def report_paired_deltas(fold_df: pd.DataFrame) -> pd.DataFrame:
+    """Deltas pareados por fold frente al incumbente.
+
+    Todos los runs comparten los mismos folds (mismo `groups`, mismo `seed`),
+    asi que `d_i = auc_challenger_i - auc_incumbent_i` es una comparacion
+    valida. Con n=5 no se construye un p-value: se reportan estadisticos
+    descriptivos y la decision se razona a partir de ellos.
+
+    E25 se excluye de la evidencia formal porque su evaluacion esta contaminada
+    entre capas (ver `step_14a_ensemble`); sus deltas se calculan igualmente
+    pero se marcan como exploratorios.
+    """
+    wide = fold_df.pivot(index="fold_idx", columns="run_name", values="roc_auc")
+    incumbent = wide[INCUMBENT]
+
+    rows = []
+    for run_name in wide.columns:
+        if run_name == INCUMBENT:
+            continue
+        d = wide[run_name] - incumbent
+        rows.append({
+            "run_name": run_name,
+            "evaluation_status": EVALUATION_STATUS[run_name][0],
+            "promotion_evaluation_valid": EVALUATION_STATUS[run_name][1],
+            "mean_paired_delta": d.mean(),
+            "median_paired_delta": d.median(),
+            "min_paired_delta": d.min(),
+            "max_paired_delta": d.max(),
+            "folds_favoring_challenger": int((d > 0).sum()),
+            "n_folds": len(d),
+        })
+
+    df = pd.DataFrame(rows)
+    out_path = TABLES_DIR / "phase14_paired_deltas.csv"
+    df.to_csv(out_path, index=False)
+
+    print()
+    print("-- Deltas pareados frente a E20 (mismos folds) --")
+    print("NOTA: E20 fue seleccionado y tuneado usando esta misma estructura de CV.")
+    print("Esto es un incumbent-vs-challenger screen, NO un benchmark imparcial")
+    print("entre familias de algoritmos.")
+    for _, r in df.iterrows():
+        marca = "" if r["promotion_evaluation_valid"] == "true" else "  [EXPLORATORIO - evaluacion contaminada]"
+        print(
+            f"{r['run_name']}: mean {r['mean_paired_delta']:+.4f} | "
+            f"median {r['median_paired_delta']:+.4f} | "
+            f"range [{r['min_paired_delta']:+.4f}, {r['max_paired_delta']:+.4f}] | "
+            f"favorables {r['folds_favoring_challenger']}/{r['n_folds']}{marca}"
+        )
+    print(f"Guardado en {out_path}")
+    return df
+
+
 def main() -> None:
     setup_mlflow()
     X, y, groups, engineered = load_dev_e13()
@@ -252,25 +357,32 @@ def main() -> None:
     print("NOTA: este script NUNCA carga ni evalua sobre el holdout congelado (Year==2025) —")
     print("ver leakage-and-validation.md seccion 9.")
 
-    diversity_df = step_14a_diversity(X, y, groups)
-    ensemble_row = step_14a_ensemble(X, y, groups)
+    diversity_df, diversity_folds = step_14a_diversity(X, y, groups)
+    ensemble_row, ensemble_folds = step_14a_ensemble(X, y, groups)
     feature_df = step_14b_feature_ablation(engineered, y, groups)
+
+    fold_df = write_fold_level_scores(diversity_folds + ensemble_folds)
 
     print("\n=== Resumen Fase 14 ===")
     print("\n-- 14a: diversidad controlada + ensemble --")
     all_14a = pd.concat([diversity_df, pd.DataFrame([ensemble_row])], ignore_index=True)
     print(all_14a[["run_name", "cv_roc_auc_mean", "cv_roc_auc_std"]].to_string(index=False))
 
-    e20_auc = diversity_df.loc[diversity_df["run_name"] == "E20_hist_gradient_boosting", "cv_roc_auc_mean"].iloc[0]
-    e20_std = diversity_df.loc[diversity_df["run_name"] == "E20_hist_gradient_boosting", "cv_roc_auc_std"].iloc[0]
-    best_row = all_14a.loc[all_14a["cv_roc_auc_mean"].idxmax()]
-    margin = best_row["cv_roc_auc_mean"] - e20_auc
-    print(f"\nE20 (incumbente, tuneado): {e20_auc:.4f}±{e20_std:.4f}")
-    print(f"Mejor candidato Fase 14: {best_row['run_name']} ({best_row['cv_roc_auc_mean']:.4f}), delta={margin:+.4f}")
-    if margin <= e20_std:
-        print("DECISION: delta dentro de 1 std de E20 -> se mantiene E20 como candidato final.")
-    else:
-        print("DECISION: delta fuera del margen de ruido de E20 -> revisar si se justifica el cambio.")
+    e20_auc = diversity_df.loc[diversity_df["run_name"] == INCUMBENT, "cv_roc_auc_mean"].iloc[0]
+    e20_std = diversity_df.loc[diversity_df["run_name"] == INCUMBENT, "cv_roc_auc_std"].iloc[0]
+    print()
+    print(f"E20 (incumbente, tuneado): {e20_auc:.4f} +/- {e20_std:.4f}")
+
+    # La comparacion valida es el delta pareado por fold, NO la resta de medias
+    # contrastada contra la std entre folds (esa std no es la incertidumbre de
+    # la diferencia entre los dos modelos). Ver `report_paired_deltas`.
+    report_paired_deltas(fold_df)
+
+    print()
+    print("NOTA METODOLOGICA: no se habia pre-especificado un umbral minimo de")
+    print("mejora practica antes de estos experimentos, por lo que la decision de")
+    print("Fase 14 es retrospectiva. La politica de aceptacion de challengers entra")
+    print("en vigor de forma prospectiva a partir de Fase 15.")
 
     print("\n-- 14b: features candidatas --")
     print(feature_df[["feature_name", "roc_auc_mean", "delta_roc_auc_vs_e13"]].to_string(index=False))

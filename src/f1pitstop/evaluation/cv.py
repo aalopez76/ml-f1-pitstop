@@ -53,6 +53,25 @@ class CVResult:
     def predict_ms_per_1k_rows_mean(self) -> float:
         return float(np.mean(self.predict_ms_per_1k_rows))
 
+    def to_fold_rows(self) -> list[dict]:
+        """Una fila por fold, para no perder la informacion por-fold al
+        persistir (`to_metrics_dict()` solo conserva mean/std).
+
+        Necesario para comparaciones pareadas entre modelos: como todos los
+        runs comparten los mismos folds (mismo `groups` y mismo `seed`), el
+        delta por fold `d_i = auc_challenger_i - auc_incumbent_i` es una
+        comparacion valida, cosa que restar dos medias no permite.
+        """
+        return [
+            {
+                "run_name": self.run_name,
+                "fold_idx": i,
+                "roc_auc": float(roc),
+                "pr_auc": float(pr),
+            }
+            for i, (roc, pr) in enumerate(zip(self.roc_auc_scores, self.pr_auc_scores))
+        ]
+
     def to_metrics_dict(self) -> dict:
         return {
             "cv_roc_auc_mean": self.roc_auc_mean,

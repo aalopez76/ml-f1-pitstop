@@ -13,7 +13,7 @@ category: Personal
 [![ROC-AUC](https://img.shields.io/badge/ROC--AUC-0.8727%20%28holdout%29-success)](https://github.com/aalopez76/ml-f1-pitstop)
 [![Kaggle](https://img.shields.io/badge/Dataset-Kaggle%20S6E5-20BEFF?logo=kaggle)](https://www.kaggle.com/competitions/playground-series-s6e5/)
 
-> **A production-grade ML pipeline**, not a notebook.  
+> **An auditable ML pipeline**, not a notebook.  
 > Predicts whether a Formula 1 driver will pit in the next lap. Carefully designed to avoid leakage, validated across multiple strategies, and benchmarked against AutoML — with surprising results.
 
 ---
@@ -155,9 +155,9 @@ Frozen at Year==2025 (26 race events, 92,894 rows), held out during all developm
 |---|---|---|---|---|
 | Dev (train+val, V1) | 346,246 | 78 | 0.8611 ± 0.0251 (CV mean) | 0.5531 |
 | Holdout (Year 2025) | 92,894 | 26 | 0.8727 | 0.6985 |
-| **Gap** | — | — | **-0.0116** ✓ (improvement, no overfitting) | +0.145 |
+| **Difference** | — | — | +0.0116 | +0.145 |
 
-✅ **Generalization confirmed.** Holdout actually *outperforms* CV — a sign of real distribution stability, not overfitting.
+The holdout result falls **within the variability observed during group-aware CV** (0.8611 +/- 0.0251), which provides no evidence of a material generalization gap. It does not demonstrate the absence of overfitting — a holdout landing slightly above the CV mean only means it landed inside the spread already measured. The holdout was evaluated exactly once, per the one-touch policy fixed in Phase 3.
 
 ---
 
@@ -248,7 +248,7 @@ artifacts/         # reports, tables, model artifacts, submission
 4. View MLflow experiment: `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`
 
 **Serialized Model:**
-- `models/sklearn/e20_final.skops` — 1.32 MB, production-ready, fully reproducible predictions
+- `models/sklearn/e20_final.skops` — 1.32 MB, single artifact, reproducible predictions verified after round-trip
 
 **Submission:**
 - `artifacts/submission.csv` — predictions on Kaggle test set (188,165 rows)
@@ -279,7 +279,7 @@ This is the kind of trade-off analysis that separates *data science from machine
 - ✅ Design validation rigorously (V1 is less comfortable than V0, but correct)
 - ✅ Ablate systematically (feature isolation reproducible, not anecdotal)
 - ✅ Benchmark fairly (AutoGluon gets same data, same splits, same folds)
-- ✅ Write production-grade code (tests, serialization, reproducibility)
+- ✅ Write maintainable, tested code (unit tests, serialization round-trip, pinned environment)
 
 **Result:** A portfolio piece that shows *judgment*, not just *technique*.
 

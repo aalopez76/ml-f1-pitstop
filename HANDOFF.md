@@ -6,15 +6,30 @@
 > Optimizar para que quien lea esto (humano o Claude, sin memoria de la
 > sesion anterior) pueda continuar sin tener que releer todo el spec.
 
-## ⚠️ CRITICAL UPDATE (2026-09-10)
+## Auditoria de rigor documental (2026-09-10)
 
-**Narrativa del proyecto reencuadrada.** Ver `artifacts/reports/Kaggle_Leaderboard_Analysis.md` — análisis crítico de qué hacen los ganadores de Kaggle vs lo que este proyecto hizo deliberadamente:
+Revision de los documentos narrativos contra la implementacion. Se encontraron
+afirmaciones que el codigo no sostiene y se corrigieron todas. Resumen:
 
-- Kaggle #1–2: 0.955 ROC-AUC (leakage + 186–218 OOFs)
-- Este proyecto: 0.8727 ROC-AUC (rigor + 1 modelo tuneado)
-- Brecha: 0.0823 AUC explicada por: leakage (−0.03), brute-force (−0.03), feature count (−0.02), noise (−0.0013)
+- **E25 (ensemble logit-stack): evaluacion contaminada entre capas.** Las OOF
+  y la CV del stacker comparten los mismos folds V1, asi que el meta-modelo se
+  entrena con meta-features producidas por modelos base que vieron su fold de
+  validacion. El codigo documentaba lo contrario. E25 queda reclasificado como
+  exploratorio, no elegible para promocion.
+- **Nunca se envio el submission a Kaggle**, luego no existia score del
+  proyecto bajo el protocolo de competicion: la comparacion "0.8727 vs 0.955"
+  que aparecia aqui no tenia dato detras. Se retira y se sustituye por una
+  late submission registrada como referencia externa.
+- **"holdout > CV = no overfitting"** no se sigue; solo indica compatibilidad
+  con la variabilidad observada en CV.
+- **"ganancia 60x menor que el ruido de CV"** comparaba el delta contra la std
+  entre folds, que no es la incertidumbre de la diferencia. Sustituido por
+  deltas pareados por fold (`artifacts/tables/phase14_paired_deltas.csv`).
+- Retiradas cifras sin trazabilidad (GPU-hours, descomposicion del gap) y las
+  atribuciones a competidores concretos.
 
-**Implicación para portafolio:** El proyecto no se presenta como "score alto" sino como "framework reproducible de decisiones de ML vs leaderboard gaming". README y análisis de Kaggle actualizados para enfatizar esto.
+Detalle y decisiones en `artifacts/reports/modeling_strategy_decision_record.md`
+y `artifacts/reports/model_selection_framework.md`.
 
 ## Estado actual
 
@@ -452,54 +467,35 @@ Otros hallazgos (Fase 1 + Fase 2, no criticos pero a resolver en Fase 3):
      torch/lightgbm/catboost/xgboost instalados) — decidir en Fase 8 si
      se instalan esos extras.
 
-## Análisis Comparativo: Tu Proyecto vs Kaggle Top 2 (2026-09-02)
+## Referencias externas de competicion (revisado 2026-09-10)
 
-Revisión de writeups de ganador y 2do lugar:
+La version previa de esta seccion nombraba participantes concretos, les
+atribuia conductas metodologicas a partir de lo que sus write-ups NO decian,
+y colocaba en una misma fila el score publico del leaderboard y el holdout
+interno de este proyecto. Las tres cosas se han retirado.
 
-**1er Lugar (Optimistix):** 186 OOF, 0.95506 (público/privado)
-- Estrategia: Manual diversidad extrema + brute force
-- Ganó por +0.00001 contra 2do lugar — margen estadístico infinitesimal
-- No documentó validación, leakage-checking ni reproducibilidad
-- Usó Claude pero con limitaciones mencionadas
+Regla editorial vigente para cualquier referencia a la competicion:
 
-**2do Lugar (Chris Deotte):** 218 modelos, 0.95502 (privado)
-- Estrategia: LLM Agent autónomo (Codex/GPT5.5) generó 230k líneas de código
-- Perdió por +0.00004 a pesar de 32 modelos MÁS que ganador
-- Muy cuidadoso con leakage (nested folds)
-- Ensemble via logit-stacking
+- Hablar de "publicly reported competition scores" y "published write-ups
+  report...", nunca de personas concretas. Los nombres solo aparecen si hacen
+  falta como atribucion bibliografica de una tecnica publicada.
+- Distinguir siempre *not reported in the available write-up* de
+  *not performed*. La ausencia de evidencia no demuestra ausencia de
+  procedimiento.
+- Nunca restar ni comparar causalmente el score publico del leaderboard con
+  la CV group-aware o el holdout interno: proceden de protocolos de
+  evaluacion distintos.
 
-**Insights Críticos de Comentarios:**
-- Optimistix a Deotte: "Expected to see strong agentic component—turned out you have even more models!"
-- Deotte: Codex generó solución en ~48 horas, pero perdió de todas formas
-- Data User (5to): "Your writeup shows you did things the right way" (a Optimistix)
-- Conclusión implícita: Ganar Kaggle ≠ "hacer las cosas correctamente"
+Lo que si es citable, por estar publicado por sus propios autores: los
+write-ups describen ensembles del orden de 200-250 corrientes de predicciones
+OOF, y algunos incluyen features agregadas cross-year o dependientes de
+temporadas futuras que no satisfarian las restricciones de informacion
+temporal adoptadas en este proyecto. El contraste util es de protocolos y
+funciones objetivo, no de personas.
 
-**Comparación Tu Proyecto vs Top 2:**
-
-| Aspecto | 1er (Optimistix) | 2do (Deotte) | **Tú** |
-|---------|---|---|---|
-| Score | 0.95506 | 0.95502 | 0.8727 (holdout) |
-| Modelos | 186 | 218 | 5 + AutoGluon |
-| Leakage audit | ❌ No documentada | ✅ Nested folds | ✅ 5-question checklist |
-| Validación | ❌ Implied V0 | ❓ Desconocida | ✅ V0 vs V1 vs V2 |
-| Reproducibilidad | ❌ Manual/implícita | ⚠️ Delegado a Codex | ✅ Scripts + seeds |
-| CV-Holdout gap | ❓ Desconocido | ❓ Desconocido | ✅ -0.0116 (mejora!) |
-| Interpretabilidad | ❌ 186 black-box | ❌ 218 black-box | ✅ 10 features, permutation importance |
-| Líneas de código FE | Unknown | 94k (Codex) | ~500 (tú) |
-| Líneas totales | Unknown | 230k (Codex) | ~2k (tú) |
-
-**Ventajas Competitivas de Tu Proyecto (Para Portafolio):**
-1. Validación rigurosa (group-aware CV, comparación de estrategias)
-2. Leakage-awareness sistemática (checklist 5-preguntas, leakage-auditor subagent)
-3. Reproducibilidad garantizada (seed fijo, scripts ejecutables, 76 tests)
-4. Generalización demostrada (holdout mejor que CV, no peor)
-5. Documentación completa (HANDOFF.md, README.md, spec 24 fases)
-6. Interpretabilidad (sé exactamente por qué gana: features > algoritmo)
-
-**Feedback Implícito de Comentarios:**
-- Data User usó enfoque de Deotte (logit-stacking) → terminó 5to
-- Optimistix reconoció que Data User "did things the right way" pero perdió
-- → Conclusión: Rigor correcto, pero Kaggle rewards brute-force + luck
+El analisis se conserva, en esa forma, dentro de
+`artifacts/reports/model_selection_framework.md`, seccion
+*Competition Protocol as an External Reference*.
 
 ## Próxima acción concreta
 
@@ -512,24 +508,31 @@ Revisión de writeups de ganador y 2do lugar:
 - Pusheo a GitHub completado: `33c05cc`
 
 **Resultados finales:**
-- **Candidato ganador:** E20_hist_gradient_boosting (manual, interpretable)
-- **CV ROC-AUC:** 0.8611±0.0251 (Fase 7, estrategia V1)
-- **Holdout ROC-AUC:** 0.8727 (Fase 13, mejor que CV!)
-- **Generalizacion:** EXITOSA (gap -0.0116, dentro del margen esperado)
-- **Ventaja vs AutoGluon:** igual en calidad (A01: 0.861), pero 5x mas
-  rapido (25s vs 121s/fold) y totalmente interpretable
+- **Candidato:** E20_hist_gradient_boosting (manual, un solo artefacto)
+- **CV ROC-AUC (V1 group-aware):** 0.8611 +/- 0.0251
+- **Holdout ROC-AUC:** 0.8727 (`Year == 2025`, evaluado una unica vez en Fase 13)
+- **Interpretacion:** el holdout cae DENTRO de la variabilidad observada en CV,
+  lo que no da evidencia de una brecha material de generalizacion. NO demuestra
+  ausencia de overfitting — esa seria una afirmacion mas fuerte que la evidencia.
+- **AutoGluon (A01, mismo feature set):** 0.861, empate dentro del ruido, a ~5x
+  el coste de computo por fold. Sin feature engineering (A00): 0.813 — el
+  feature engineering domina sobre la eleccion de algoritmo.
+- **Kaggle:** ver `artifacts/reports/kaggle_late_submission.md`. Las tres
+  cantidades (CV, holdout, late submission) proceden de protocolos distintos y
+  no se restan entre si.
 
-**Pregunta de portafolio:** respondida
-"How much does a carefully designed, leakage-aware ML pipeline gain or lose
-against AutoML?" → EMPATE en AUC, pero VICTORIA en velocidad,
-interpretabilidad y costo computacional.
+**Pregunta de portafolio:** "How much does a carefully designed, leakage-aware
+ML pipeline gain or lose against AutoML, and what is the cost in complexity,
+compute and interpretability?" -> Empate en ROC-AUC; el pipeline manual es mas
+rapido, tiene menor complejidad de despliegue relativa y una via de explicacion
+(permutation importance global) que el ensemble interno de AutoML no ofrece.
 
 **Artefactos listos para portafolio:**
 - `models/sklearn/e20_final.skops`: modelo serializado, reproducible
 - `artifacts/submission.csv`: predicciones para Kaggle (188,165 filas)
 - README.md: narrativa completa de las 13 fases
 - MLflow experiment: `f1_pitstop`, stage=final, tags/metricas completas
-- Tests: 76 tests pasan, ruff limpio, sin deuda tecnica
+- Tests: suite completa en verde, ruff limpio
 
 **GitHub & Portafolio Deployment (COMPLETADO — sesión 2026-09-02):**
 ✅ Repositorio público creado: https://github.com/aalopez76/ml-f1-pitstop
@@ -554,7 +557,7 @@ interpretabilidad y costo computacional.
 - Modelo serializado: `models/sklearn/e20_final.skops` (1.32 MB, reproducible)
 - Submission para Kaggle: `artifacts/submission.csv`
 - MLflow experiment: `f1_pitstop`, 21 runs, stage=final completo
-- Tests: 76 tests pasan, ruff limpio, sin deuda tecnica
+- Tests: suite completa en verde, ruff limpio
 - Documentación: README.md (13 fases), HANDOFF.md (estado actual), spec completa
 
 Nota: `notebooks/01_data_audit.ipynb` y `02_eda.ipynb` de la arquitectura
@@ -562,95 +565,78 @@ del spec no se crearon — los criterios de salida de Fase 1 y 2 se
 cubrieron via reportes `.md` + tests + figuras reproducibles.
 `03_leakage_and_validation.ipynb` (Fase 3) sí se creó (exigido por spec).
 
-## Fase 14 — Model Selection Framework (IMPLEMENTADA, 2026-09-02)
+## Fase 14 — Incumbent Challenge Evaluation (revisada 2026-09-10)
 
-Las "Mejoras Opcionales" documentadas mas abajo (version original de esta
-seccion) se implementaron parcialmente, con resultado real medido en vez
-de estimado — ver `artifacts/reports/model_selection_framework.md` para
-el analisis completo.
+Reencuadrada: la pregunta no es "que algoritmo gana" sino **"¿hay evidencia
+suficiente para reemplazar a E20?"**. Con ese encuadre, que E20 estuviera
+tuneado y E22-E24 corrieran con defaults deja de ser un desequilibrio y pasa a
+ser el diseno: un *challenger screening* barato.
 
-**Tier 1 (implementado, `scripts/phase14_model_selection_framework.py`):**
-E22 (XGBoost), E23 (CatBoost), E24 (LightGBM) sobre E13/CV V1, sin tuning
-individual, comparados contra E20 YA TUNEADO (no contra un E20 en
-desventaja):
+Analisis completo y tablas en
+`artifacts/reports/model_selection_framework.md`. Resultados por fold en
+`artifacts/tables/phase14_fold_level_scores.csv`; deltas pareados en
+`artifacts/tables/phase14_paired_deltas.csv`.
 
-| run | ROC-AUC (mean±std) | fit (s/fold) | delta vs E20 |
-|---|---|---|---|
-| E20 (incumbente, tuneado) | 0.8611±0.0250 | 4.39 | — |
-| E22 XGBoost (default) | 0.8590±0.0229 | 2.24 | -0.0021 |
-| E23 CatBoost (default) | 0.8606±0.0216 | 153.58 | -0.0005 |
-| E24 LightGBM (default) | 0.8593±0.0272 | 1.46 | -0.0018 |
-| E25 Ensemble (logit-stack, OOF de los 4) | 0.8615±0.0246 | — | +0.0004 |
+**Tres correcciones sobre la version de 2026-09-02:**
 
-**Decision: se mantiene E20.** Ninguno supera el margen de ruido de CV
-(std 0.025); el ensemble gana +0.0004 (~60x menor que su propio std) a
-costa de mantener 4 modelos, uno de ellos (CatBoost) 35x mas lento de
-entrenar. No se justifica.
+1. **La comparacion estadistica era invalida.** Se contrastaba la diferencia
+   de medias contra la desviacion tipica entre folds ("~60x menor que el
+   ruido"). Esa std no es la incertidumbre de la diferencia. Como todos los
+   runs comparten folds, ahora se reportan deltas pareados por fold (media,
+   mediana, min, max, folds favorables), sin construir un p-value con n=5.
 
-**Tier 2 (implementado, mismo script):** 2 features candidatas
-(`laptime_roll_mean_5`, `pit_stops_rate_last3`) sobre E13, cada una con
-checklist de leakage + test adversarial ya cerrados en
-`tests/test_features.py`:
+2. **La evaluacion de E25 esta contaminada.** Las OOF y la CV del stacker
+   comparten los mismos folds, de modo que el meta-modelo se entrena con
+   meta-features producidas por modelos base que vieron su fold de validacion.
+   El codigo afirmaba lo contrario en dos docstrings. E25 queda como
+   `exploratory_contaminated` / `promotion_evaluation_valid = false`, marcado
+   en el propio CSV. Su delta observado no es estimacion valida de rendimiento
+   incremental. No se construye stacking anidado: el objetivo de la fase es
+   decidir si invertir mas, y un delta de esa magnitud bajo evaluacion
+   invalida no lo justifica.
 
-| feature | delta vs E13 | veredicto |
-|---|---|---|
-| `laptime_roll_mean_5` | -0.0390 | rechazada (hereda inestabilidad de `laptime_roll_mean_3`, Fase 6) |
-| `pit_stops_rate_last3` | +0.0002 | rechazada (ganancia ~100x menor que ruido de CV) |
+3. **No habia umbral de mejora fijado de antemano.** La fase decidia si cada
+   delta era suficiente despues de verlo. No se corrige inventando un umbral
+   retroactivo: Fase 14 se declara retrospectiva, y una **Challenger
+   Acceptance Policy** (G0-G6, pre-registro en `configs/experiments/<id>.yaml`
+   commiteado antes de ejecutar) entra en vigor de forma prospectiva desde
+   Fase 15.
 
-**Tier 3 (documentado, no implementado):** ensemble gigante, tuning
-obsesivo, drift mitigation ad-hoc — costo/beneficio explicito en el
-reporte dedicado.
+**Sobre-generalizaciones corregidas:** las dos ventanas rolling evaluadas (3 y
+5 vueltas) degradaron la generalizacion, lo que no da evidencia para seguir en
+esa familia — no se afirma que ninguna ventana funcione. Se elimino la
+estimacion de ganancia de un ensemble grande (no derivable de los datos
+disponibles) y la afirmacion de saber como responderian XGB/Cat/LGBM al
+tuning: la razon para no tunearlos es de presupuesto experimental.
 
-**Tier 4 (decision documentada, sin codigo):** se identifico la tentacion
-de verificar estabilidad de permutation importance en el holdout: se
-decidio NO hacerlo porque viola `.claude/rules/leakage-and-validation.md`
-seccion 9 (agregada en esta fase) — el holdout se evalua una unica vez
-(ya ocurrio en Fase 13) y eso aplica tambien a analisis "solo
-diagnostico".
+**Candidato final SIN CAMBIOS: `E20_hist_gradient_boosting`.**
 
-**Candidato final SIN CAMBIOS: `E20_hist_gradient_boosting`** — la
-evidencia real (no la expectativa) confirma que el modelo de Fase 7 sigue
-siendo la mejor opcion disponible una vez contado el costo de cada
-alternativa.
+**Cambios de codigo (2026-09-10):** `CVResult.to_fold_rows()` en
+`src/f1pitstop/evaluation/cv.py`; `EVALUATION_STATUS`,
+`write_fold_level_scores()` y `report_paired_deltas()` en
+`scripts/phase14_model_selection_framework.py`; docstrings de
+`compute_oof_predictions()` y `step_14a_ensemble()` corregidos;
+`tests/test_phase14_artifacts.py` nuevo; `configs/experiments/_template.yaml`
+nuevo.
 
-**Cambios de codigo:** `src/f1pitstop/models/manual_models.py` (+E22/E23/
-E24 + `DIVERSITY_REGISTRY`), `src/f1pitstop/models/ensemble.py` (nuevo,
-E25), `src/f1pitstop/features/temporal.py` (+2 features candidatas),
-`scripts/phase14_model_selection_framework.py` (nuevo). Suite de tests:
-92+ (16 nuevos), ruff limpio. Subagente `leakage-auditor` invocado antes
-de cerrar (regla de CLAUDE.md para cambios bajo `features/`).
+## Plan original de mejoras (retirado 2026-09-10)
 
-## Mejoras Opcionales originales (Basadas en Análisis Kaggle Top 1 y 2, superseded por Fase 14)
+Esta seccion contenia un plan de mejoras priorizado por ROI, con ganancias
+estimadas por tier (+0.003-0.008, +0.002-0.010) y justificaciones basadas en
+lo que habrian hecho participantes concretos de la competicion.
 
-**RECOMENDACIÓN: NO IMPLEMENTAR** (proyecto ya es excelente para portafolio)
+Se retira entera por dos motivos:
 
-**Razón:** Top 2 perdió contra Top 1 por +0.00004 a pesar de 32 modelos MÁS. 
-Ganancia marginal << costo de 18+ horas adicionales.
+1. **Las estimaciones no tenian base.** Fase 14 midio el Tier 1 realmente y el
+   resultado quedo entre -0.0021 y +0.0004, fuera del rango estimado. Las
+   cifras se habian escrito sin experimento que las sostuviera.
+2. **Atribuia conductas a personas identificables** a partir de sus write-ups
+   publicos, incluida la inferencia de que "no documentaron cuando parar".
 
-**Si quisiera mejorar (jerarquía de ROI):**
-
-**Tier 1 (6 horas, +0.003–0.008):** ← Vale la pena si hay tiempo
-- E22_xgboost_basic (default, E13 features, CV V1)
-- E23_catboost_basic (default, E13 features, CV V1)
-- E24_lightgbm_basic (default, E13 features, CV V1)
-- E25_ensemble_3way (logit-stacking, E20+E21+best de XGB/Cat/LGBM, Optuna n_trials=20)
-- Justificación: Top 1 y 2 usaron Big 6 (XGB, Cat, LGBM, RealMLP, TabM, TabICL)
-
-**Tier 2 (4–8 horas, +0.002–0.010):** ← Exploración cuidada
-- E26_extra_temporal_features (5-lap rolling mean, pit_stops_rate, stint_progress)
-- E27_interaction_features (TyreLife × Stint, Position × Compound)
-- Condición: cada feature pasa checklist 5-preguntas leakage + test adversarial
-
-**Tier 3 (❌ NO HACER):**
-- Ensemble gigante (186+ modelos) — Top 2 tuvo 218 y perdió
-- Drift mitigation para 2023 — es limitación documentada, no bug
-- Tuning obsesivo (Optuna n_iter=100+) — rendimientos decrecientes
-
-**Resultado real obtenido en Fase 14 (no estimado):** Tier 1 midio entre
--0.0021 y +0.0004 (no +0.003–0.008 como se estimaba aqui originalmente) —
-la estimacion previa era demasiado optimista; el resultado real fue
-"ningun candidato nuevo justifica reemplazar a E20", que es en si mismo
-el hallazgo de valor de la fase.
+Lo que si se conserva, ya medido y en su sitio: los resultados reales de Tier 1
+y Tier 2 en `artifacts/reports/model_selection_framework.md`, y las referencias
+externas de competicion en su seccion *Competition Protocol as an External
+Reference*, redactadas sin nombrar a nadie.
 
 ## Bloqueadores / dudas abiertas
 

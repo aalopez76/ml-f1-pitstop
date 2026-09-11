@@ -29,3 +29,7 @@ data/external/
 models/*.pkl
 models/*.skops
 
+
+# Notas de trabajo, no forman parte del repositorio
+Mejoras/
+opinion*.txt

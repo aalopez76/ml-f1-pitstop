@@ -1,0 +1,61 @@
+# Plantilla de pre-registro de un challenger (Challenger Acceptance Policy).
+#
+# En vigor de forma PROSPECTIVA a partir de Fase 15. Fase 14 se ejecuto sin
+# umbral pre-especificado y su decision queda declarada como retrospectiva
+# (ver artifacts/reports/model_selection_framework.md).
+#
+# Uso: copiar a configs/experiments/<experiment_id>.yaml, rellenar, y
+# COMMITEAR ANTES de ejecutar el experimento. El commit de este fichero debe
+# preceder al commit de los resultados; esa frontera es la evidencia de que
+# el criterio no se construyo despues de ver el numero.
+#
+# La plantilla no trae valores por defecto a proposito. Un 0.002 de ejemplo
+# terminaria copiandose como si fuera universal, que es justo lo que esta
+# politica quiere evitar.
+
+challenger: <nombre del run, p.ej. E26_...>
+incumbent: E20_hist_gradient_boosting
+policy_commit: <SHA del commit que introduce la politica>
+
+acceptance:
+  # G1 — mejora predictiva. Delta PAREADO medio por fold frente al incumbente,
+  # no diferencia de medias.
+  roc_auc_mpe: <define_before_run>
+  mpe_rationale: "<required>"   # por que esa magnitud, argumentado antes de medirla
+
+  # G3 — metrica secundaria. Cuanta degradacion de PR-AUC se tolera.
+  pr_auc_tolerance: <define_before_run>
+
+  # G2 — consistencia. Grupos sobre los que se exige comportamiento estable.
+  # Con 5 folds no se construye un score de robustez: se reportan media,
+  # mediana, min, max y numero de folds favorables, y se razona la decision.
+  critical_groups: <define_before_run>
+
+  # G4 — latencia. Si no es una restriccion real de ESTE challenger, se
+  # declara applicable: false con su motivo, en vez de inventar un
+  # presupuesto para rellenar el fichero.
+  latency_budget_ms:
+    applicable: <true|false>
+    rationale: "<required if false>"
+    measurement_protocol: "<mismo hardware, batch, warm-up, n repeticiones, mediana/p95>"
+
+# G6 — reproducibilidad. Tests en verde NO implica reproducible. La tolerancia
+# se fija ANTES de la segunda ejecucion, no despues de ver cuanto difiere.
+reproducibility:
+  metric_abs_tolerance: <define_before_run>
+
+# G5 — complejidad. Inventario cualitativo explicito; no se inventa un score.
+complexity_inventory:
+  model_count: <n>
+  new_dependencies: []
+  new_feature_transformations: []
+  artifact_size_mb: <n>
+  training_time_per_fold_s: <n>
+  serving_path_changes: "<descripcion o 'none'>"
+
+# G0 — leakage. El challenger no entra si no pasa el checklist de 5 preguntas
+# de .claude/rules/leakage-and-validation.md y, si toca features, el test
+# adversarial de tests/test_features.py.
+leakage_audit_passed: <true|false>
+
+defined_before_run: true
