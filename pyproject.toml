@@ -12,6 +12,9 @@ dependencies = [
     "pytest>=9.1.1",
     "ruff>=0.16.4",
     "scikit-learn>=1.9.0",
+    # shap==0.51.0 pins numba==0.53.1 -> llvmlite==0.36.0, incompatible con
+    # Python >=3.10 (build failure). Version excluida explicitamente.
+    "shap!=0.51.0",
     "skops>=0.14.0",
     "skore>=0.25.0",
     "skrub>=0.10.0",

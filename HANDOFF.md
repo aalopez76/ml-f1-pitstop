@@ -497,6 +497,69 @@ El analisis se conserva, en esa forma, dentro de
 `artifacts/reports/model_selection_framework.md`, seccion
 *Competition Protocol as an External Reference*.
 
+## Reencuadre de alcance y explicabilidad SHAP (2026-09-10, sesion posterior)
+
+**Decision de alcance:** el proyecto NO se convierte en el vehiculo de
+"MLOps end-to-end" (eso corresponde a un cuarto proyecto del portafolio,
+distinto de este). Produccion se reduce a una seccion breve de "Next Steps
+Toward Production" en el ADR. El esfuerzo real se concentra en profundizar
+el core: datos -> EDA -> pipeline riguroso (manual + AutoML) -> model
+selection -> **explicabilidad**.
+
+**SHAP anadido** como extension de Fase 9, reconsiderando la decision
+original del ADR ("SHAP no implementado"). Global + 2 ejemplos locales, uno
+de ellos anclado al segmento `Year == 2023` ya documentado como drift en
+Fase 10 (cierra el circulo: error analysis dice *donde* falla, SHAP local
+muestra *por que* en un caso concreto).
+
+**Hallazgo tecnico real durante la implementacion** (no generico): `shap`
+en su ultima version resuelta por `uv` (`0.51.0`) trae un pin roto a
+`numba==0.53.1` -> `llvmlite==0.36.0`, incompatible con Python >=3.10.
+Excluida explicitamente en `pyproject.toml` (`shap!=0.51.0`); `shap==0.50.0`
+instala limpio.
+
+**Segundo hallazgo, mas relevante:** `shap.TreeExplainer` no soporta el
+manejo nativo de categoricas de `HistGradientBoostingClassifier`
+(`categorical_features=[...]`, dtype pandas `"category"`) en esta version
+de `shap` — intenta castear todo a float y falla con `Compound`. Verificado
+con un smoke test antes de construir nada mas (cultura del proyecto: Fase 0
+= smoke test antes de comprometer arquitectura). Solucion: envolver
+`predict_proba` sobre un espacio one-hot (`build_onehot_wrapper`,
+`src/f1pitstop/evaluation/explainability.py`), verificado que reproduce
+exactamente las predicciones del modelo real antes de confiar en cualquier
+valor SHAP derivado. Costo: `PermutationExplainer` generico en vez de
+`TreeExplainer` nativo, ~400ms/fila medido sobre datos reales — por eso el
+calculo global usa una muestra estratificada de 500 filas, no el dev
+completo (a ese ritmo, el dev completo tomaria >38h). Documentado como
+compromiso deliberado, no limitacion oculta.
+
+**Resultado de la comparacion permutation vs SHAP:** ambos metodos
+coinciden en el top 4 de importancia (`Stint` > `TyreLife` ≈
+`pit_stops_so_far` > `LapNumber`) — dos metodos con mecanismos distintos
+llegando al mismo ranking es evidencia mas fuerte que cualquiera de los dos
+por separado. Detalle completo en
+`artifacts/reports/explainability_report.md`.
+
+**Cambios de codigo:** `src/f1pitstop/evaluation/explainability.py` (nuevo:
+`build_onehot_wrapper`, `stratified_sample`); `scripts/phase9_shap_explainability.py`
+(nuevo); `tests/test_explainability.py` (nuevo, 3 tests incluyendo la
+propiedad de aditividad SHAP y la limitacion de `TreeExplainer` fijada como
+regresion); `pyproject.toml` (+shap, excluyendo 0.51.0);
+`artifacts/reports/modeling_strategy_decision_record.md` seccion 4
+actualizada (SHAP ya no figura como "no implementado").
+
+Suite: 101 tests pasan (98 previos + 3 nuevos), ruff limpio.
+
+**Pendiente de esta sesion:** actualizar el ADR con la seccion breve "Next
+Steps Toward Production" (deployment, monitoring, rollback, API contract —
+mencion, no documentos dedicados, ver decision de alcance arriba); anadir
+CI real con GitHub Actions (tests + lint en cada push — higiene de
+ingenieria de software estandar, no "MLOps end-to-end", la regla 4 de
+`CLAUDE.md` prohibe CI/CD de *modelos*, no de codigo); Model Card;
+diagrama de arquitectura del pipeline completo (Mermaid); nombrar
+explicitamente la Challenger Acceptance Policy (Fase 15, ya construida)
+como la politica de promocion de modelos del proyecto.
+
 ## Próxima acción concreta
 
 **AUDITORÍA DE RIGOR COMPLETADA (2026-09-10)** — commit `547e53e`.

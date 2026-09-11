@@ -112,15 +112,42 @@ by construction).
 ### Interpretability, stated precisely
 
 `HistGradientBoostingClassifier` does **not** expose `feature_importances_`.
-Global interpretability comes from model-agnostic **permutation importance**
-(`sklearn.inspection.permutation_importance`, used in Phase 9). Local
-explanation — why a *particular* row received a particular probability —
-would require SHAP or an equivalent method and **is not implemented in this
-project**.
+Global interpretability comes from two independent methods that were cross-
+checked against each other, not just one taken on faith: model-agnostic
+**permutation importance** (`sklearn.inspection.permutation_importance`,
+Phase 9) and **SHAP** (Phase 9 extension,
+`scripts/phase9_shap_explainability.py`). Both rank `Stint`, `TyreLife` and
+`pit_stops_so_far` as the top three features, in that order of closeness —
+agreement between two mechanistically different methods (perturbation-based
+degradation vs. additive attribution) is stronger evidence than either
+method alone.
+
+**Local explanation** — why a *particular* row received a particular
+probability — is implemented via SHAP for two illustrative cases (a
+high-confidence correct prediction, and a real false negative from the
+`Year == 2023` drift segment already identified in Phase 10), not as a
+general-purpose per-request explanation service. That remains out of scope
+(see "Next Steps Toward Production").
+
+**A real compatibility limitation was found and worked around, not
+assumed away:** `shap.TreeExplainer` (the fast, native path for tree
+ensembles) does not support HGB's native categorical handling
+(`categorical_features=[...]`) in the installed `shap` version — it fails
+casting the categorical column to float. The workaround wraps
+`predict_proba` over a one-hot-encoded space and uses the generic
+`shap.Explainer` (`PermutationExplainer`, model-agnostic), verified to
+reproduce the original model's predictions exactly before trusting any
+SHAP value derived from it (`tests/test_explainability.py`). This is
+slower (~400 ms/row measured), which is why the global SHAP computation
+runs on a stratified sample of 500 rows, not the full 346k-row dev set —
+a deliberate cost/coverage trade-off, documented as such in
+`artifacts/reports/explainability_report.md`, not a resource limitation
+left unstated.
 
 Top features by permutation importance (Phase 9, on `dev`): `Stint` 0.072,
 `TyreLife` 0.064, `pit_stops_so_far` 0.048, `LapNumber` 0.029,
-`Compound` 0.018.
+`Compound` 0.018. Full comparison against SHAP in
+`artifacts/reports/explainability_report.md`.
 
 ---
 
