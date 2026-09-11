@@ -499,71 +499,37 @@ El analisis se conserva, en esa forma, dentro de
 
 ## Próxima acción concreta
 
-**PROYECTO 100% COMPLETADO Y LISTO PARA PORTAFOLIO** — Todas las 13 fases cerradas, código en GitHub, artículo en Medium, página personal actualizada.
+**AUDITORÍA DE RIGOR COMPLETADA (2026-09-10)** — commit `547e53e`.
 
-**Commit final (2026-09-02, sesión última):**
-- Agregados artefactos finales de análisis (Fases 9-10): error_analysis/ (6 CSVs de segmentación) y skore/ (permutation importance)
-- F1_Pit_Stop_ML.md (narrativa para portafolio personal) commiteado
-- Eliminado e20_oof_predictions.csv (35 MB, generado, no necesario versionar)
-- Pusheo a GitHub completado: `33c05cc`
+Fase 14 ha sido completamente revisada tras una auditoría crítica del código y los documentos narrativos. Los hallazgos fueron:
 
-**Resultados finales:**
-- **Candidato:** E20_hist_gradient_boosting (manual, un solo artefacto)
-- **CV ROC-AUC (V1 group-aware):** 0.8611 +/- 0.0251
-- **Holdout ROC-AUC:** 0.8727 (`Year == 2025`, evaluado una unica vez en Fase 13)
-- **Interpretacion:** el holdout cae DENTRO de la variabilidad observada en CV,
-  lo que no da evidencia de una brecha material de generalizacion. NO demuestra
-  ausencia de overfitting — esa seria una afirmacion mas fuerte que la evidencia.
-- **AutoGluon (A01, mismo feature set):** 0.861, empate dentro del ruido, a ~5x
-  el coste de computo por fold. Sin feature engineering (A00): 0.813 — el
-  feature engineering domina sobre la eleccion de algoritmo.
-- **Kaggle:** ver `artifacts/reports/kaggle_late_submission.md`. Las tres
-  cantidades (CV, holdout, late submission) proceden de protocolos distintos y
-  no se restan entre si.
+1. **E25 (stacking ensemble):** evaluación contaminada entre capas — docstrings corregidos, reclasificado como `exploratory_contaminated` / `promotion_evaluation_valid: false`.
+2. **Análisis estadístico inválido:** comparación de delta contra std entre folds reemplazada por deltas pareados por fold (media, mediana, rango, favorables).
+3. **E20 se mantiene como candidato final.** Ninguno de E22/E23/E24 supera el incumbente; E25 no aporta evidencia válida.
 
-**Pregunta de portafolio:** "How much does a carefully designed, leakage-aware
-ML pipeline gain or lose against AutoML, and what is the cost in complexity,
-compute and interpretability?" -> Empate en ROC-AUC; el pipeline manual es mas
-rapido, tiene menor complejidad de despliegue relativa y una via de explicacion
-(permutation importance global) que el ensemble interno de AutoML no ofrece.
+Artifacts nuevos:
+- `artifacts/tables/phase14_fold_level_scores.csv` (25 rows: 5 runs × 5 folds)
+- `artifacts/tables/phase14_paired_deltas.csv` (4 runs válidos)
+- `artifacts/reports/modeling_strategy_decision_record.md` (reescrito ADR)
+- `artifacts/reports/model_selection_framework.md` (reencuadre a Incumbent Challenge Evaluation)
+- `artifacts/reports/kaggle_late_submission.md` (trazabilidad en dos bloques)
+- `configs/experiments/_template.yaml` (Challenger Acceptance Policy G0-G6)
 
-**Artefactos listos para portafolio:**
-- `models/sklearn/e20_final.skops`: modelo serializado, reproducible
-- `artifacts/submission.csv`: predicciones para Kaggle (188,165 filas)
-- README.md: narrativa completa de las 13 fases
-- MLflow experiment: `f1_pitstop`, stage=final, tags/metricas completas
-- Tests: suite completa en verde, ruff limpio
+Documentos eliminados (numerología, atribuciones personales, comparaciones inválidas):
+- `artifacts/reports/Kaggle_Leaderboard_Analysis.md`
+- `artifacts/reports/Medium_Post_Kaggle_Analysis_Draft.md`
+- Archivos bajo `Mejoras/` (nunca versionados; `opinion*.txt` permanecen fuera del índice)
 
-**GitHub & Portafolio Deployment (COMPLETADO — sesión 2026-09-02):**
-✅ Repositorio público creado: https://github.com/aalopez76/ml-f1-pitstop
-✅ Todo el código pusheado (168 commits finales, 2.91 MiB)
-✅ README mejorado con badges y métricas finales
-✅ Topics agregados: machine-learning, formula1, kaggle, scikit-learn, autogluon, feature-engineering, portfolio-project, mlflow
-✅ Descripción corta agregada al repo
-✅ Master branch sincronizado con GitHub
-✅ Proyecto agregado a página personal: https://aalopez76.github.io/projects/F1_Pit_Stop_ML/
-✅ Medium post publicado: https://medium.com/@aalpzp/how-i-built-an-f1-pit-stop-predictor-andtl-dr-68c3fe2b1cb6
-  - Título: "How I Built an F1 Pit Stop Predictor — And Why It Beats AutoML Without Trying"
-  - 2,500+ palabras, narrativa completa
-  - Topics: machine-learning, AutoML, Kaggle, data-science
-  - Link a GitHub incluido en el post
+Tests: 98 pasan, ruff limpio.
 
-**Lecciones aprendidas — Documentadas en:**
-- Medium post (narrativa completa, 5-min read)
-- GitHub README (especificación técnica, resultados)
-- Página personal (integración con portafolio)
+**¿Qué sigue?**
 
-**Artefactos listos para portafolio:**
-- Modelo serializado: `models/sklearn/e20_final.skops` (1.32 MB, reproducible)
-- Submission para Kaggle: `artifacts/submission.csv`
-- MLflow experiment: `f1_pitstop`, 21 runs, stage=final completo
-- Tests: suite completa en verde, ruff limpio
-- Documentación: README.md (13 fases), HANDOFF.md (estado actual), spec completa
+El proyecto está en estado de **limpieza de auditoría completada**. Recomendación:
 
-Nota: `notebooks/01_data_audit.ipynb` y `02_eda.ipynb` de la arquitectura
-del spec no se crearon — los criterios de salida de Fase 1 y 2 se
-cubrieron via reportes `.md` + tests + figuras reproducibles.
-`03_leakage_and_validation.ipynb` (Fase 3) sí se creó (exigido por spec).
+1. **Opción A:** Enviar late submission a Kaggle (ver instrucciones en `artifacts/reports/kaggle_late_submission.md`) — esto es una acción externa que el usuario debe ejecutar manualmente.
+2. **Opción B:** Cerrar Fase 14 como completa; el proyecto está listo para portafolio.
+
+El repositorio está en estado **reproducible y auditable**. No hay deuda técnica residual en el dominio de decisiones de modelado.
 
 ## Fase 14 — Incumbent Challenge Evaluation (revisada 2026-09-10)
 
