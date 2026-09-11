@@ -560,6 +560,38 @@ diagrama de arquitectura del pipeline completo (Mermaid); nombrar
 explicitamente la Challenger Acceptance Policy (Fase 15, ya construida)
 como la politica de promocion de modelos del proyecto.
 
+## Tres narrativas de portafolio (2026-09-10, misma sesion)
+
+Se acordaron y construyeron tres piezas de comunicacion separadas, calibradas
+por audiencia (decision del usuario, no default asumido):
+
+- **GitHub** (repo mismo) — rigor metodologico, fuente primaria de evidencia.
+  No requeria texto nuevo; se agrego `artifacts/reports/github_narrative_map.md`
+  como mapa de lectura (README -> ADR -> model_selection_framework ->
+  explainability_report), para que un revisor tecnico sepa en que orden
+  recorrer documentos que ya existian.
+- **Medium** — divulgativo pero senior/staff, ~10 min de lectura.
+  `artifacts/reports/medium_article_draft.md` (nuevo, articulo completo)
+  **reemplaza** el post publicado y hace obsoleto
+  `artifacts/reports/medium_post_addendum.md` (eliminado — su enfoque de
+  "confesion de errores" como postscript separado ya no encaja; la nueva
+  version integra esa honestidad metodologica desde el inicio de la
+  narrativa, no al final).
+- **Blog personal** — nivel de detalle mas fino, tecnico, extenso.
+  `F1_Pit_Stop_ML.md` (raiz del repo, frontmatter Jekyll para la pagina
+  personal) reescrito completo: 8 secciones (problema -> datos/EDA ->
+  validacion -> pipeline -> manual vs AutoML -> Fase 14 como caso de
+  estudio de proceso -> SHAP con el detalle tecnico completo -> que falta
+  para produccion, nombrado sin implementar). Badges actualizados a 101
+  tests.
+
+Estructura comun a las tres: contexto del problema -> datos/EDA -> pipeline
+(el core) -> explicabilidad -> produccion como mencion breve, no capitulo
+propio (decision de alcance: el ciclo MLOps end-to-end es un proyecto
+separado del portafolio). Ninguna nombra competidores de la competicion de
+origen del dataset (regla de anonimizacion vigente desde la auditoria
+anterior).
+
 ## Próxima acción concreta
 
 **AUDITORÍA DE RIGOR COMPLETADA (2026-09-10)** — commit `547e53e`.
