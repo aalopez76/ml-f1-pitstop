@@ -1,0 +1,205 @@
+ML-F1-PITSTOP — PLAN DE MEJORA DEL REPOSITORIO (AJUSTE FINAL)
+===================================================================
+
+PROPÓSITO
+---------
+Convertir el repositorio en un proyecto de portafolio profesional, técnicamente
+defendible y reproducible, SIN convertirlo artificialmente en una plataforma de
+producción o un sistema de gobernanza de modelos que no existe.
+
+PRINCIPIO RECTOR
+----------------
+Toda mejora debe responder al menos una de estas preguntas:
+1. ¿Corrige un error real?
+2. ¿Evita leakage o una interpretación incorrecta?
+3. ¿Mejora la reproducibilidad?
+4. ¿Ayuda a justificar una decisión experimental?
+
+Si una mejora no cumple ninguna, probablemente sobra.
+
+======================================================================
+P0 — CORRECCIONES OBLIGATORIAS
+======================================================================
+
+P0.1 — CORREGIR EL HOLDOUT: USAR `id`, NO EL ÍNDICE DE PANDAS
+--------------------------------------------------------------
+Problema real:
+`freeze_final_holdout()` guarda los valores de la columna `id`, pero algunos
+scripts posteriores usan `df.index.isin(holdout_ids)`.
+
+Cambio: Sustituir `df.index.isin(holdout_ids)` por `df["id"].isin(holdout_ids)`.
+Crear en `src/f1pitstop/data/split.py` una función `split_frozen_holdout()` que
+valide la columna `id`, cargue los IDs, devuelva dev + holdout y compruebe
+solapamiento y total de filas.
+Crear test con un DataFrame donde `df.index != df["id"]`.
+
+P0.2 — CENTRALIZAR LOS HIPERPARÁMETROS EXACTOS DE E20
+------------------------------------------------------
+Problema: RandomizedSearchCV seleccionó parámetros exactos, pero fases posteriores
+reconstruyen E20 con valores redondeados escritos manualmente.
+
+Cambio: Guardar `best_params_` reales en:
+`artifacts/model_selection/e20_best_params.json`
+Contenido mínimo: run_name, model_family, feature_set, validation_strategy, seed,
+best_params, cv_roc_auc_mean, cv_roc_auc_std.
+Crear función `load_e20_best_params()` y usarla en phase11, 12, 13 y 14.
+
+P0.3 — CORREGIR LAS AFIRMACIONES DE INTERPRETABILIDAD
+------------------------------------------------------
+Eliminar "fully interpretable", "completely interpretable", "Interpretable: Yes".
+Usar: "easier to inspect and audit than the AutoML ensemble", "single-model
+pipeline", "global inspection via permutation importance", "lower model complexity".
+
+P0.4 — ELIMINAR "MODEL IN PRODUCTION"
+-------------------------------------
+Usar: "selected final model", "final candidate", "model carried forward".
+No usar: "production model", "deployed model", "ship".
+
+P0.5 — CORREGIR LAS REFERENCIAS A LOS GANADORES DE KAGGLE
+---------------------------------------------------------
+Corregir score final ganador, score final segundo lugar, margen ~0.00001.
+Distinguir el 0.95506 previo de Chris Deotte de su score final.
+No usar "probable V0". Usar: "validation protocol not fully specified in the
+public writeup". Eliminar cifras no respaldadas por fuente primaria.
+
+P0.6 — CORREGIR LA NARRATIVA DEL COSTE COMPUTACIONAL (SIN RATIOS)
+------------------------------------------------------------------
+No usar "5x faster" ni "5x less compute" en ningún documento público del repo.
+Si se publica un benchmark, medir solo:
+A. Final candidate fit time/fold (con la advertencia de que el coste de búsqueda
+   de E20 no fue instrumentado desde el principio).
+B. Prediction latency por 1,000 filas.
+C. Serialized artifact size, SOLO si realmente se mide.
+Lenguaje seguro: "Once selected, the HGB candidate had a substantially smaller
+operational footprint than the AutoML ensemble under this benchmark."
+
+======================================================================
+P1 — MEJORAS DE ALTO VALOR (SIN SOBREINGENIERÍA)
+======================================================================
+
+P1.1 — REESCRIBIR EL README COMO ENTRADA EJECUTIVA
+---------------------------------------------------
+Estructura recomendada:
+1. Project title + one-line problem statement.
+2. Dataset caveat: synthetic Kaggle competition data.
+3. Core experimental question.
+4. Validation strategy (V0, V1, V2).
+5. Key results table (E20 CV, holdout 2025, AutoGluon comparison).
+6. Final model decision and why it was retained.
+7. Reproduction (`uv sync` + script).
+8. Repository structure.
+9. Limitations.
+10. Links to detailed reports.
+
+Mover detalles largos a `artifacts/reports/` y `docs/`.
+
+P1.2 — CRITERIO DE CIERRE DEL EXPERIMENTO (REDACTADO EN PASADO)
+----------------------------------------------------------------
+No llamarlo "Model Adoption Criteria" ni "Model Governance".
+Llamarlo "Experiment Closure Criterion" y redactarlo en pasado:
+
+"El criterio para cerrar la exploración fue: ningún challenger (XGBoost, CatBoost,
+LGBM, Ensemble) superó a E20 en el CV group-aware con un margen que justificara
+su mayor complejidad operacional (medida en footprint y latencia). Dado que la
+ganancia máxima del ensemble fue de +0.0004 (ruido frente a la desviación de
+0.025), se decidió mantener E20 como modelo final."
+
+Esto es una conclusión, no una política de gobierno.
+
+P1.3 — COMPARACIÓN PAREADA, PERO SIMPLE
+---------------------------------------
+Conservar OOF predictions y ROC-AUC por fold. Calcular delta por fold:
+challenger_auc - e20_auc. Reportar media y rango del delta.
+Lenguaje final: "The observed differences were small and inconsistent relative to
+fold-to-fold variability." No hacer bootstrap ni p-values obligatorios.
+
+P1.4 — CI REAL
+---------------
+Crear `.github/workflows/ci.yml` con checkout, uv sync, ruff check y pytest -m "not slow".
+Reemplazar badges manuales por el estado del workflow.
+
+P1.5 — LICENSE COHERENTE
+------------------------
+Si el README afirma MIT, añadir LICENSE y declarar en pyproject. Si no, retirar badge.
+
+P1.6 — UNA ÚNICA RUTA DE REPRODUCCIÓN
+-------------------------------------
+Crear `scripts/reproduce_final_result.py` que valide datos, cargue dev con IDs
+congelados, construya E13, cargue parámetros E20, ejecute V1 e imprima métricas.
+NO debe reabrir el holdout 2025.
+
+P1.7 — ORGANIZAR LA DOCUMENTACIÓN DE CLAUDE CODE
+------------------------------------------------
+Mantener CLAUDE.md en raíz solo si la herramienta lo necesita. Mover el resto a
+`docs/development/claude-code/`. En README solo una nota breve sobre el uso de
+Claude Code como asistente de coding y review.
+
+======================================================================
+P2 — VISUALES: SOLO LOS QUE EXPLICAN UNA DECISIÓN
+======================================================================
+
+Crear como máximo 2 figuras principales (coherentes con el artículo):
+
+FIGURA 1 — VALIDATION MATTERS
+- V0 random split vs V1 group-aware split.
+- Mismo modelo, mismas features.
+
+FIGURA 2 — DIMINISHING RETURNS (EVOLUCIÓN)
+- Eje X: E10 → E11 → E13 → E20 → AutoGluon → XGBoost → CatBoost → Ensemble.
+- Eje Y: ROC-AUC.
+- Incluir barras de error (std dev de folds) para mostrar que las mejoras
+  posteriores a E20 caen dentro del ruido.
+
+Eliminar del scope actual: calibration curve, heatmap circuito x año,
+ROC comparativa sobre holdout, complexity score inventado.
+
+======================================================================
+P3 — COSAS QUE NO DEBEN AÑADIRSE (OBLIGATORIO)
+======================================================================
+
+NO añadir como requisito:
+- Model Card formal.
+- Experiment registry manual duplicando MLflow.
+- Model governance o champion/challenger framework de producción.
+- Monitoring, MLOps, API, Kubernetes.
+- Calibration study o SHAP (salvo que respondan a una pregunta nueva).
+- Más modelos solo por diversidad o más tuning.
+- Reabrir el holdout 2025.
+- **Un benchmark de tiempo de entrenamiento que compare E20 y AutoGluon**
+  **sin haber instrumentado el coste de búsqueda de E20 desde el principio.**
+
+Si alguna de estas piezas se incorpora en el futuro, debe responder a una pregunta
+nueva del proyecto, no a la necesidad de "hacerlo parecer senior".
+
+======================================================================
+DEFINITION OF DONE — REPOSITORIO
+======================================================================
+
+[ ] Holdout filtrado por `id`.
+[ ] Test con index != id.
+[ ] Parámetros E20 centralizados.
+[ ] Claims de interpretabilidad corregidos.
+[ ] "Model in production" eliminado.
+[ ] Referencias Kaggle corregidas.
+[ ] No se usan ratios de tiempo (5x) sin instrumentación.
+[ ] README simplificado y ejecutivo.
+[ ] CI real.
+[ ] LICENSE coherente.
+[ ] Reproducción en 1–2 comandos.
+[ ] Criterio de cierre redactado en pasado (no como política de futuro).
+[ ] Comparación pareada sin inferencia exagerada.
+[ ] Máximo 2 figuras principales.
+[ ] Holdout 2025 permanece cerrado.
+[ ] No se añaden artefactos que dupliquen información existente.
+[ ] No se añade benchmark de tiempos de entrenamiento sin haber medido el coste
+    de búsqueda de E20 desde el principio.
+
+RESULTADO ESPERADO
+------------------
+El repositorio debe verse como:
+"Un workflow reproducible y consciente de leakage para un problema sintético de
+predicción en F1, con diseño de validación explícito, ablación de features,
+evaluación de challengers y decisiones de parada documentadas."
+
+No como:
+"Una plataforma de model governance o producción disfrazada de proyecto de portafolio."

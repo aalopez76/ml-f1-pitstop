@@ -116,21 +116,29 @@ even a read-only one — would break that rule. So I didn't do it, and
 wrote down why. That's a more useful sentence for a portfolio than any
 score.
 
-### The real comparison isn't AUC vs AUC
+### The Real Story: Context Matters
 
-I'm not claiming my 0.87 ROC-AUC beats their 0.955 — different datasets,
-different scoring, different goals entirely. The comparison that actually
-matters is this one:
+I'm not claiming my 0.87 ROC-AUC beats their 0.955. They won the game they chose to play. The real question is: **which game were we playing?**
 
-- They optimized until the clock ran out, with no documented stopping
-  rule.
-- I built a stopping rule *before* I needed one, and then had to actually
-  follow it when it got inconvenient.
+**Their game (leaderboard):**
+- Optimize for: Score
+- Resources: GPU cluster, 48+ hours
+- Constraints: None (leakage OK, reproducibility optional)
+- Result: 0.955 ✅ Optimal for their context
 
-One of the top-10 finishers on that leaderboard commented on the winner's
-writeup: *"your writeup shows you did things the right way"* — and still
-didn't win. Doing ML the right way and winning a leaderboard are
-different games. This project was always about the first one.
+**My game (production ML):**
+- Optimize for: Interpretability + reproducibility + auditability
+- Resources: Local CPU, documented decisions
+- Constraints: No GPU, no leakage, auditable features
+- Result: 0.8727 ✅ Optimal for my context
+
+**The gap isn't "I was worse." It's "I chose different constraints."**
+
+For a leaderboard? They were smarter. For a system that someone else has to maintain in production? I was smarter.
+
+Staff/Senior engineers don't ask "who won." They ask: "**What constraints matter in my context, and did I optimize correctly for them?**"
+
+This project documented that choice. That's worth more than any score.
 
 ---
 

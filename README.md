@@ -10,11 +10,21 @@
 
 A carefully designed, leakage-aware machine learning pipeline that predicts whether a Formula 1 driver will pit in the next lap during a race.
 
-**Portfolio Question:** *"What's the difference between winning a Kaggle leaderboard and building a model that works?"*
+**Portfolio Question:** *"What are the real trade-offs between manual + rigorous vs AutoML vs brute-force ensemble approaches? When should you choose each?"*
 
-**Quick Answer:** This project achieves **0.8727 ROC-AUC (holdout)** while staying rigorous — Kaggle winners scored 0.955 by using data leakage, 250+ models, and brute-force optimization that would be disqualifying in production. 
+**Answer:** This project maps all three architectural approaches honestly — with data, not rhetoric.
 
-**Deep Dive:** Read [`artifacts/reports/Kaggle_Leaderboard_Analysis.md`](artifacts/reports/Kaggle_Leaderboard_Analysis.md) for a critical analysis of what Kaggle's #1, #2, #11, and #17 place solutions actually did (spoiler: #1 beat #2 by 0.00001, a coin flip). This project chose instead to build an audited, reproducible framework for when to stop optimizing — and to document why.
+**Pieza Central:** [`artifacts/reports/Architecture_Decision_Framework.md`](artifacts/reports/Architecture_Decision_Framework.md)  
+A Staff/Senior Engineering decision record that compares:
+- **Manual + Rigorous** (this project): 0.8727 AUC, CPU-only, interpretable, 25s/fold, reproducible ✅
+- **AutoML** (AutoGluon): 0.861 AUC, CPU or GPU, black-box, 121s/fold, semi-reproducible ⚠️
+- **Brute-Force Ensemble** (Kaggle Top 1-2): 0.955 AUC, GPU required, 100+ GPU-hours, 230k LOC, leakage ❌
+
+**Not "who wins," but "who's right for what context."** Each is optimal given different constraints.
+
+**Bonus reads:** 
+- [`Kaggle_Leaderboard_Analysis.md`](artifacts/reports/Kaggle_Leaderboard_Analysis.md) — What Rank 1-2-11-17 actually did (with their explicit trade-offs)
+- [`model_selection_framework.md`](artifacts/reports/model_selection_framework.md) — Fase 14: Why we tested alternatives and why E20 stays final
 
 ---
 

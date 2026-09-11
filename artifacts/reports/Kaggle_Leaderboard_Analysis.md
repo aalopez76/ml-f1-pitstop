@@ -1,6 +1,6 @@
-# Kaggle Leaderboards Lie: A Critical Analysis
+# Kaggle Winners Analysis: Context Matters
 
-> **TL;DR:** The top Kaggle solutions in this competition (Ranks 1–2, Ranks 11–17) intentionally use data leakage and brute-force ensemble tactics that would be disqualifying in production ML. This project deliberately chose the opposite path and documents the trade-offs. Spoiler: Kaggle's #1 beat #2 by *0.00001* — a statistical coin flip.
+> **TL;DR:** The top Kaggle solutions (Ranks 1–2, Ranks 11–17) optimized brilliantly for the leaderboard context. This project optimized for production ML context. Both are correct in their own domains. This doc maps what each chose and why.
 
 ---
 
@@ -472,6 +472,14 @@ This project optimized for #1 and explicitly rejected #2 and #3.
 
 ## Closing Statement
 
-> **"Kaggle won't teach you to build the right model. It will teach you to build the winning model. These are not the same thing."**
->
-> This project is a case study in the difference.
+Kaggle rewards one thing: leaderboard score.  
+Production rewards another: robustness, interpretability, auditability.
+
+Both Kaggle winners and this project made the right choice **for their context.** Kaggle's Rank 1-2 are phenomenal engineering achievements — they solved their problem optimally. This project solved a different problem optimally.
+
+The sophistication is in understanding:
+- When leakage is acceptable (leaderboard: yes; production: no)
+- When brute-force is justified (unlimited GPU budget: yes; local CPU: no)
+- When interpretability matters (audited systems: yes; auto-ranking: no)
+
+**This project documents all three trade-offs.** That's the real deliverable, not the score.
